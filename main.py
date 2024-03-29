@@ -1,7 +1,6 @@
 import os
 import re
 import subprocess
-from typing import Dict, List
 
 from crewai import Agent, Task, Crew
 from crewai_tools import tool
@@ -25,7 +24,8 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
             type_part, scope_part = type_part.split('(', 1)
         if not type_part.islower():
             errors.append("Commit type must be lowercase.")
-        valid_types = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert', 'security']
+        valid_types = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert',
+                       'security']
         if type_part not in valid_types:
             errors.append(f"Invalid commit type '{type_part}'. Valid types are: {', '.join(valid_types)}")
         description_part = description_part.strip()
@@ -86,7 +86,8 @@ def is_git_repo(path):
 def get_last_commit_info(repo_path):
     """Get the last commit message and changes from the git repository at the given path"""
     try:
-        commit_msg = subprocess.check_output(['git', '-C', repo_path, 'log', '-1', '--pretty=%B']).decode('utf-8').strip()
+        commit_msg = subprocess.check_output(['git', '-C', repo_path, 'log', '-1', '--pretty=%B']).decode(
+            'utf-8').strip()
         commit_diff = subprocess.check_output(['git', '-C', repo_path, 'diff', 'HEAD^', 'HEAD']).decode('utf-8')
         return commit_msg, commit_diff
     except subprocess.CalledProcessError as e:
@@ -107,59 +108,65 @@ def main(repo_path=None, dry_run=False):
         print("Unable to get last commit information")
         return
 
-    code_analyzer = Agent(
-        role='Code Analysis Expert',
+    code_analyser = Agent(
+        role='Code Change Summariser',
         goal="""
-        Examine the recent code changes meticulously to provide a comprehensive summary. Focus on identifying the essence of modifications and their implications.
-        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-        Old Commit Message:
-        {commit_msg}
-        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-        Commit Diff:
-        {commit_diff}
-        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-""",
-        backstory="With years of experience dissecting and evaluating code across numerous projects, you've developed an exceptional ability to detect the nuances in code changes. Your expertise not only lies in understanding the technicalities but also in foreseeing the potential impact of these changes. Equipped with a discerning eye for detail, you serve as the guardian of code quality, ensuring that every change is made for the better.",
+            Concisely summarise the key aspects of the code modifications. Highlight added, removed, 
+            or updated functionality. Aim for a high-level overview that captures the essence.
+            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+            Old Commit Message:
+            {commit_msg}
+            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+            Commit Diff:
+            {commit_diff}
+            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+            """,
+        backstory="You excel at distilling complex code changes into their core components. Your summaries are renowned for their clarity and ability to convey the heart of the modifications.",
         verbose=True,
         memory=True,
         allow_delegation=False
     )
 
     commit_suggester = Agent(
-        role='Conventional Commit Advocate',
-        goal="""Craft a commit message that encapsulates the essence of the code changes. Adhere to the conventional commit format, emphasizing clarity and adherence to standards.
-        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-        Old Commit Message:
-        {commit_msg}
-        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-        Commit Diff:
-        {commit_diff}
-        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-""",
-        backstory='In the realm of code, where clarity and precision reign supreme, you stand as a beacon of best practices. Your journey through the corridors of countless repositories has imbued you with the wisdom of effective communication. Your messages are more than mere annotations; they are narratives that guide the future developers through the labyrinth of logic, ensuring that every commit serves as a clear signpost.',
+        role='Conventional Commit Craftsperson',
+        goal="""
+            Compose a clear and descriptive commit message adhering to the conventional commit format.
+            Encapsulate the nature of the change in the type and description. Provide a concise yet 
+            informative summary in the subject line. When needed, elaborate further in the body.
+            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+            Old Commit Message:
+            {commit_msg}
+            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+            Commit Diff:
+            {commit_diff}
+            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+            """,
+        backstory='With a deep understanding of clean commit practices, you craft messages that not only describe the change but also provide valuable context for future developers.',
         verbose=True,
         memory=True,
         allow_delegation=False,
         tools=[commit_message_validator]
     )
 
-    analyze_task = Task(
-        objective=f"Summarize the code changes",
-        description="Review the git diff and provide a brief summary of the changes",
-        expected_output="A concise summary of the code changes",
-        result_format="Provide a clear and concise summary of the code changes",
-        agent=code_analyzer,
+    analyse_task = Task(
+        objective=f"Summarise key aspects of the code changes",
+        description="Provide a high-level overview of the modifications, focusing on added, removed, or updated functionality",
+        expected_output="A clear and concise summary of the essential code changes",
+        result_format="A focused summary that captures the core of the code modifications",
+        agent=code_analyser,
     )
 
     suggest_task = Task(
-        objective="Suggest a conventional commit message based on the summary of code changes",
-        description="Use the analysis result to propose a commit message that follows conventional commit standards",
-        expected_output="A suggested conventional commit message",
-        result_format="Provide a clear and concise commit message that adheres to conventional commit guidelines",
+        objective="Compose a descriptive conventional commit message",
+        description="Craft a commit message encapsulating the change type and key details, adhering to conventional commit standards",
+        expected_output="A well-structured conventional commit message accurately reflecting the changes",
+        result_format="A thoughtfully composed commit message that enhances the project's commit history",
         agent=commit_suggester,
     )
 
     crew = Crew(
-        agents=[code_analyzer, commit_suggester],
-        tasks=[analyze_task, suggest_task],
+        agents=[code_analyser, commit_suggester],
+        tasks=[analyse_task, suggest_task],
         verbose=True
     )
 
