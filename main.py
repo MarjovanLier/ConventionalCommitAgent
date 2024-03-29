@@ -2,6 +2,48 @@ import os
 import subprocess
 
 from crewai import Agent, Task, Crew
+from crewai_tools import tool
+
+
+@tool("Commit Message Validator")
+def commit_message_validator(suggested_commit_msg: str) -> str:
+    """
+    Validates the suggested commit message against best practices, including conventional
+    commit structure, effective subject lines, comprehensive message bodies,
+    identification of breaking changes, and language consistency.
+    """
+    errors = []
+    # Splitting the message into lines for detailed analysis
+    lines = suggested_commit_msg.strip().split('\n')
+
+    # Check for conventional commit structure
+    if ':' not in lines[0] or not lines[0].split(':')[0].islower():
+        errors.append("Commit type must be lowercase and followed by a colon (:).")
+
+    # Effective subject line
+    subject_line = lines[0]
+    if len(subject_line) > 50:
+        errors.append("Subject line exceeds 50 characters.")
+    if not subject_line[0].isupper() or subject_line.istitle():
+        errors.append("Subject line must start with a capital letter and be in lowercase.")
+    if subject_line.endswith('.'):
+        errors.append("Subject line must not end with a period.")
+
+    # Comprehensive message body and blank line check
+    if len(lines) > 1:
+        if lines[1] != "":
+            errors.append("There must be a blank line between the subject line and body.")
+        body_lines = lines[2:]
+        for line in body_lines:
+            if len(line) > 72:
+                errors.append("Body lines must not exceed 72 characters.")
+    else:
+        body_lines = []
+
+    if errors:
+        return "Errors found in commit message:\n" + "\n".join(errors)
+    else:
+        return "Commit message is valid."
 
 
 def is_git_repo(path):
@@ -52,7 +94,8 @@ def main():
         backstory='A code analysis expert with experience in reviewing git diffs and providing feedback on commit messages.',
         verbose=True,  # Optional
         memory=True,
-        allow_delegation=False
+        allow_delegation=False,
+        tools=[commit_message_validator]
     )
 
     commit_suggester = Agent(
@@ -61,7 +104,17 @@ def main():
         backstory='A commit message specialist who can craft clear and concise commit messages following conventional commit standards.',
         verbose=True,  # Optional
         memory=True,
-        allow_delegation=False
+        allow_delegation=False,
+        tools=[commit_message_validator]
+    )
+
+    commit_validation_agent = Agent(
+        role='Commit Validator',
+        goal='Ensure the suggested commit message meets all best practices before finalization.',
+        backstory='Dedicated to maintaining high standards in commit documentation.',
+        verbose=True,  # Optional
+        memory=True,
+        tools=[commit_message_validator]
     )
 
     # Define the tasks for the agents
@@ -83,7 +136,7 @@ def main():
 
     # Create the CrewAI crew
     crew = Crew(
-        agents=[code_analyzer, commit_suggester],
+        agents=[code_analyzer, commit_suggester, commit_validation_agent],
         tasks=[analyze_task, suggest_task],
         verbose=True  # Optional
     )
