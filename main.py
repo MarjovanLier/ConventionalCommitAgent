@@ -48,53 +48,59 @@ def main():
     # Create the CrewAI agents
     code_analyzer = Agent(
         role='Code Analyzer',
-        goal='Analyze code changes and suggest improvements to the commit message',
-        backstory='A code analysis expert with experience in reviewing git diffs and providing feedback on commit messages.'
+        goal='Analyze code changes and suggest improvements to the commit message. Git diff:\n{commit_diff}',
+        backstory='A code analysis expert with experience in reviewing git diffs and providing feedback on commit messages.',
+        verbose=True,  # Optional
+        memory=True,
+        allow_delegation=False
     )
 
     commit_suggester = Agent(
         role='Commit Message Suggester',
-        goal='Suggest a new conventional commit message based on the code changes',
-        backstory='A commit message specialist who can craft clear and concise commit messages following conventional commit standards.'
+        goal='Suggest a new conventional commit message based on the code changes. Current commit message: "{commit_msg}"',
+        backstory='A commit message specialist who can craft clear and concise commit messages following conventional commit standards.',
+        verbose=True,  # Optional
+        memory=True,
+        allow_delegation=False
     )
 
     # Define the tasks for the agents
     analyze_task = Task(
-        objective=f"Analyze the following code changes:\n{commit_diff}",
+        objective=f"Analyze the following code changes",
         description="Review the git diff and provide a summary of the code changes",
         expected_output="A brief summary of the code changes",
-        result_format="Provide a brief summary of the code changes"
+        result_format="Provide a brief summary of the code changes",
+        agent=code_analyzer
     )
 
     suggest_task = Task(
         objective="Suggest a new conventional commit message based on the summary of code changes",
         description="Use the analysis result to propose a new commit message",
         expected_output="A suggested conventional commit message",
-        result_format="Provide the suggested commit message"
+        result_format="Provide the suggested commit message",
+        agent=commit_suggester
     )
 
     # Create the CrewAI crew
-    crew = Crew(agents=[code_analyzer, commit_suggester])
+    crew = Crew(
+        agents=[code_analyzer, commit_suggester],
+        tasks=[analyze_task, suggest_task],
+        verbose=True  # Optional
+    )
 
-    # Adjusted to use 'kickoff' as per the documentation
-    result = crew.kickoff()
+    # Execute the tasks using the kickoff method
+    print(
+        crew.kickoff(
+            inputs={
+                'commit_diff': commit_diff,
+                'commit_msg': commit_msg
+            }
+        )
+    )
 
-    # Assuming 'result' contains the outcomes of the tasks, which might need to be adjusted based on actual usage
-    print(f"Original commit message: {commit_msg}")
-    # This part will depend on how 'result' is structured and how outcomes are accessed
-    print("Analysis of code changes and suggested commit message would be displayed here based on 'result' structure")
-
-    # Assuming 'result' contains outcomes in a structured format, e.g., {'analyze_task': 'Analysis result...', 'suggest_task': 'Suggested commit message...'}
-    if result:  # Check if 'result' is not None or empty
-        # Accessing task results from 'result'
-        analysis_result = result.get('analyze_task', 'No analysis result available.')
-        suggested_commit_msg = result.get('suggest_task', 'No suggested commit message available.')
-
-        print(f"Original commit message: {commit_msg}")
-        print(f"Analysis of code changes: {analysis_result}")
-        print(f"Suggested commit message: {suggested_commit_msg}")
-    else:
-        print("No results available from the crew execution.")
+    # print(f"Original commit message: {commit_msg}")
+    # print(f"Analysis of code changes: {analysis_result}")
+    # print(f"Suggested commit message: {suggested_commit_msg}")
 
 
 if __name__ == '__main__':
