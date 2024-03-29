@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 from typing import Dict, List
 
@@ -101,30 +102,36 @@ def main(repo_path=None, dry_run=False):
         return
 
     code_analyzer = Agent(
-        role='Code Analyzer',
-        goal='Analyze code changes and summarize them. Git diff:\n{commit_diff}',
-        backstory='A code analysis expert with experience in reviewing git diffs.',
+        role='Code Analysis Expert',
+        goal="""
+        Examine the recent code changes meticulously to provide a comprehensive summary. Focus on identifying the essence of modifications and their implications.
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        Old Commit Message:
+        {commit_msg}
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        Commit Diff:
+        {commit_diff}
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-""",
+        backstory="With years of experience dissecting and evaluating code across numerous projects, you've developed an exceptional ability to detect the nuances in code changes. Your expertise not only lies in understanding the technicalities but also in foreseeing the potential impact of these changes. Equipped with a discerning eye for detail, you serve as the guardian of code quality, ensuring that every change is made for the better.",
         verbose=True,
         memory=True,
         allow_delegation=False
     )
 
     commit_suggester = Agent(
-        role='Commit Message Suggester',
-        goal='Suggest a concise yet descriptive conventional commit message based on the code changes. The message should follow this format: <type>[optional scope]: <description>\n\nType should be one of feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, security.\nOptional scope can specify the area of the code affected.\nDescription should be capitalized and not end with a period.',
-        backstory='A seasoned developer experienced in writing clear and concise commit messages following conventional commit standards.',
+        role='Conventional Commit Advocate',
+        goal="""Craft a commit message that encapsulates the essence of the code changes. Adhere to the conventional commit format, emphasizing clarity and adherence to standards.
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        Old Commit Message:
+        {commit_msg}
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        Commit Diff:
+        {commit_diff}
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-""",
+        backstory='In the realm of code, where clarity and precision reign supreme, you stand as a beacon of best practices. Your journey through the corridors of countless repositories has imbued you with the wisdom of effective communication. Your messages are more than mere annotations; they are narratives that guide the future developers through the labyrinth of logic, ensuring that every commit serves as a clear signpost.',
         verbose=True,
         memory=True,
         allow_delegation=False,
-        tools=[commit_message_validator]
-    )
-
-    commit_validation_agent = Agent(
-        role='Commit Validator',
-        goal='Ensure the suggested commit message follows best practices. Provide actionable suggestions if needed.',
-        backstory='Dedicated to maintaining high standards in commit documentation.',
-        verbose=True,
-        memory=True,
         tools=[commit_message_validator]
     )
 
@@ -133,7 +140,7 @@ def main(repo_path=None, dry_run=False):
         description="Review the git diff and provide a brief summary of the changes",
         expected_output="A concise summary of the code changes",
         result_format="Provide a clear and concise summary of the code changes",
-        agent=code_analyzer
+        agent=code_analyzer,
     )
 
     suggest_task = Task(
@@ -141,20 +148,12 @@ def main(repo_path=None, dry_run=False):
         description="Use the analysis result to propose a commit message that follows conventional commit standards",
         expected_output="A suggested conventional commit message",
         result_format="Provide a clear and concise commit message that adheres to conventional commit guidelines",
-        agent=commit_suggester
-    )
-
-    validate_task = Task(
-        objective="Review the suggested commit message",
-        description="Ensure the suggested commit message follows best practices and provide feedback",
-        expected_output="Validation result and feedback on the suggested commit message",
-        result_format="Provide validation result and actionable feedback",
-        agent=commit_validation_agent
+        agent=commit_suggester,
     )
 
     crew = Crew(
-        agents=[code_analyzer, commit_suggester, commit_validation_agent],
-        tasks=[analyze_task, suggest_task, validate_task],
+        agents=[code_analyzer, commit_suggester],
+        tasks=[analyze_task, suggest_task],
         verbose=True
     )
 
@@ -176,18 +175,33 @@ def main(repo_path=None, dry_run=False):
     lines = result.split("\n")
     for i in range(len(lines)):
         if lines[i].startswith("[Code Analyzer] Task output:"):
-            analysis_result = lines[i + 1].strip()
+            j = i + 1
+            while j < len(lines) and not lines[j].startswith("["):
+                analysis_result += lines[j].strip() + " "
+                j += 1
         elif lines[i].startswith("[Commit Message Suggester] Task output:"):
             suggested_commit_msg = lines[i + 1].strip().strip('"')
         elif lines[i].startswith("[Commit Validator] Task output:"):
-            validation_result = lines[i + 1].strip()
+            j = i + 1
+            while j < len(lines) and not lines[j].startswith("["):
+                validation_result += lines[j].strip() + " "
+                j += 1
+
+    # Extract the suggested commit message and validation result from the result string
+    suggested_commit_msg_match = re.search(r'"(.*?)"', result)
+    if suggested_commit_msg_match:
+        suggested_commit_msg = suggested_commit_msg_match.group(1)
+
+    validation_result_match = re.search(r'The commit message "(.*?)" is valid', result)
+    if validation_result_match:
+        validation_result = validation_result_match.group(0)
 
     print(f"Original commit message: {commit_msg}")
     print(f"Analysis of code changes: {analysis_result}")
     print(f"Suggested commit message: {suggested_commit_msg}")
     print(f"Validation result: {validation_result}")
 
-    if not dry_run and validation_result == "Commit message is valid.":
+    if not dry_run and "is valid and follows the best practices" in validation_result:
         # Amend the last commit with the suggested message
         subprocess.check_call(['git', '-C', repo_path, 'commit', '--amend', '-m', suggested_commit_msg])
         print("Last commit message has been updated.")
