@@ -1,9 +1,18 @@
 import os
 import re
 import subprocess
-
+from pathlib import Path
 from crewai import Agent, Task, Crew
 from crewai_tools import tool
+from dotenv import load_dotenv
+from langchain_anthropic import ChatAnthropic
+
+
+dotenv_path = Path('.env')
+load_dotenv(dotenv_path=dotenv_path)
+
+# claude_llm = ChatAnthropic(model="claude-3-haiku-20240307", )
+claude_llm = ChatAnthropic(model="claude-3-sonnet-20240229", )
 
 
 @tool("Commit Message Validator")
@@ -130,7 +139,8 @@ def main(repo_path=None, dry_run=False):
         backstory="You excel at distilling complex code changes into their core components. Your summaries are renowned for their clarity and ability to convey the heart of the modifications.",
         verbose=True,
         memory=True,
-        allow_delegation=False
+        allow_delegation=False,
+        llm=claude_llm
     )
 
     commit_suggester = Agent(
@@ -159,7 +169,8 @@ def main(repo_path=None, dry_run=False):
         verbose=True,
         memory=True,
         allow_delegation=False,
-        tools=[commit_message_validator]
+        tools=[commit_message_validator],
+        llm=claude_llm
     )
 
     analyse_task = Task(
@@ -177,14 +188,15 @@ def main(repo_path=None, dry_run=False):
     crew = Crew(
         agents=[code_analyser, commit_suggester],
         tasks=[analyse_task, suggest_task],
-        verbose=True
+        verbose=True,
+        llm=claude_llm
     )
 
     result = crew.kickoff(
         inputs={
             'commit_diff': commit_diff,
             'commit_msg': commit_msg
-        }
+        },
     )
 
     print("-=-=-=-=-=-=-=-")
