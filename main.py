@@ -21,6 +21,8 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
         errors.append("Commit message must include a type followed by a colon (:).")
     else:
         type_part, description_part = lines[0].split(':', 1)
+        if '(' in type_part and ')' in type_part:
+            type_part, scope_part = type_part.split('(', 1)
         if not type_part.islower():
             errors.append("Commit type must be lowercase.")
         valid_types = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert', 'security']
@@ -36,6 +38,10 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
         suggestions.append("Subject line should be limited to around 50 characters where possible.")
     if subject_line.endswith('.'):
         suggestions.append("Subject line should not end with a full stop.")
+
+    # Validate body existence
+    if len(lines) < 3:
+        errors.append("Commit message should have a body providing more details about the changes.")
 
     # Validate blank line between subject and body, if body exists
     if len(lines) > 1 and lines[1] != "":
@@ -196,10 +202,11 @@ def main(repo_path=None, dry_run=False):
     if validation_result_match:
         validation_result = validation_result_match.group(0)
 
-    print(f"Original commit message: {commit_msg}")
-    print(f"Analysis of code changes: {analysis_result}")
-    print(f"Suggested commit message: {suggested_commit_msg}")
-    print(f"Validation result: {validation_result}")
+    print(f"Original commit message:\n{commit_msg}\n\n")
+    print(f"Analysis of code changes:\n{analysis_result}\n\n")
+    suggested_commit_msg = re.sub(r'\\n', '\n', suggested_commit_msg)
+    print(f"Suggested commit message:\n{suggested_commit_msg}\n\n")
+    print(f"Validation result:\n{validation_result}\n\n")
 
     if not dry_run and "is valid and follows the best practices" in validation_result:
         # Amend the last commit with the suggested message
