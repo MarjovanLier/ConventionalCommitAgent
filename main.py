@@ -1,12 +1,13 @@
 import os
 import re
 import subprocess
+import time
 from pathlib import Path
+
 from crewai import Agent, Task, Crew
 from crewai_tools import tool
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
-
 
 dotenv_path = Path('.env')
 load_dotenv(dotenv_path=dotenv_path)
@@ -92,16 +93,34 @@ def is_git_repo(path):
         return False
 
 
+def pull_commit_messages_text_file(repo_path):
+    """See if the file commit_messages.txt exists and it was changed in the last 10 minutes. If so, return the content"""
+    try:
+        commit_messages_file = os.path.join(repo_path, 'commit_messages.txt')
+        if os.path.exists(commit_messages_file):
+            last_modified = os.path.getmtime(commit_messages_file)
+            current_time = time.time()
+            if current_time - last_modified < 600:
+                with open(commit_messages_file, 'r') as f:
+                    return f.read()
+    except Exception as e:
+        print(f"Error reading commit_messages.txt: {str(e)}")
+    return None
+
+
 def get_last_commit_info(repo_path):
     """Get the last commit message and changes from the git repository at the given path"""
     try:
         commit_msg = subprocess.check_output(['git', '-C', repo_path, 'log', '-1', '--pretty=%B']).decode(
             'utf-8').strip()
         commit_diff = subprocess.check_output(['git', '-C', repo_path, 'diff', 'HEAD^', 'HEAD']).decode('utf-8')
-        return commit_msg, commit_diff
+
+        commit_messages = pull_commit_messages_text_file(repo_path)
+
+        return commit_msg, commit_diff, commit_messages
     except subprocess.CalledProcessError as e:
         print(f"Error getting last commit info: {str(e)}")
-        return None, None
+        return None, None, None
 
 
 def main(repo_path=None, dry_run=False):
@@ -112,7 +131,7 @@ def main(repo_path=None, dry_run=False):
         print(f"{repo_path} is not a git repository")
         return
 
-    commit_msg, commit_diff = get_last_commit_info(repo_path)
+    commit_msg, commit_diff, commit_messages = get_last_commit_info(repo_path)
     if commit_msg is None or commit_diff is None:
         print("Unable to get last commit information")
         return
@@ -135,6 +154,8 @@ def main(repo_path=None, dry_run=False):
         Commit Diff:
         {commit_diff}
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        Other Commit Messages:
+        {commit_messages}
         """,
         backstory="You excel at distilling complex code changes into their core components. Your summaries are renowned for their clarity and ability to convey the heart of the modifications.",
         verbose=True,
@@ -164,6 +185,8 @@ def main(repo_path=None, dry_run=False):
         Commit Diff:  
         {commit_diff}
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        Other Commit Messages:
+        {commit_messages}
         """,
         backstory='With a deep understanding of clean commit practices, you craft messages that not only describe the change but also provide valuable context for future developers.',
         verbose=True,
@@ -195,7 +218,8 @@ def main(repo_path=None, dry_run=False):
     result = crew.kickoff(
         inputs={
             'commit_diff': commit_diff,
-            'commit_msg': commit_msg
+            'commit_msg': commit_msg,
+            'commit_messages': commit_messages,
         },
     )
 
