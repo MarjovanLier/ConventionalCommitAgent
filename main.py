@@ -1,12 +1,13 @@
 import os
 import subprocess
+from typing import Dict, List
 
 from crewai import Agent, Task, Crew
 from crewai_tools import tool
 
 
 @tool("Commit Message Validator")
-def commit_message_validator(suggested_commit_msg: str) -> str:
+def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] | bool]:
     """
     Validates the suggested commit message against best practices for conventional commits,
     focusing on structure, subject line, body comprehensiveness, and breaking changes.
@@ -23,7 +24,7 @@ def commit_message_validator(suggested_commit_msg: str) -> str:
             errors.append("Commit type must be lowercase.")
         valid_types = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert', 'security']
         if type_part not in valid_types:
-            errors.append(f"Invalid commit type. Valid types are: {', '.join(valid_types)}")
+            errors.append(f"Invalid commit type '{type_part}'. Valid types are: {', '.join(valid_types)}")
         description_part = description_part.strip()
         if description_part and not description_part[0].isupper():
             suggestions.append("Commit description should start with a capital letter.")
@@ -59,12 +60,11 @@ def commit_message_validator(suggested_commit_msg: str) -> str:
                 if not change.startswith("BREAKING CHANGE:"):
                     errors.append("Breaking changes in the footer must start with 'BREAKING CHANGE:' for emphasis.")
 
-    if errors:
-        return f"Errors found in commit message:\n" + "\n".join(errors) + "\n\nSuggestions:\n" + "\n".join(suggestions)
-    elif suggestions:
-        return f"Commit message is valid, but consider the following suggestions:\n" + "\n".join(suggestions)
-    else:
-        return "Commit message is valid."
+    return {
+        "errors": errors,
+        "suggestions": suggestions,
+        "is_valid": len(errors) == 0
+    }
 
 
 def is_git_repo(path):
@@ -144,9 +144,17 @@ def main(repo_path=None, dry_run=False):
         agent=commit_suggester
     )
 
+    validate_task = Task(
+        objective="Review the suggested commit message",
+        description="Ensure the suggested commit message follows best practices and provide feedback",
+        expected_output="Validation result and feedback on the suggested commit message",
+        result_format="Provide validation result and actionable feedback",
+        agent=commit_validation_agent
+    )
+
     crew = Crew(
         agents=[code_analyzer, commit_suggester, commit_validation_agent],
-        tasks=[analyze_task, suggest_task],
+        tasks=[analyze_task, suggest_task, validate_task],
         verbose=True
     )
 
@@ -157,20 +165,29 @@ def main(repo_path=None, dry_run=False):
         }
     )
 
+    print("-=-=-=-=-=-=-=-")
+    print(result)
+    print("-=-=-=-=-=-=-=-")
+
     # Parse the result string to extract the task outputs
     analysis_result = ""
     suggested_commit_msg = ""
-    for line in result.split("\n"):
-        if line.startswith("[Code Analyzer] Task output:"):
-            analysis_result = line.split("[Code Analyzer] Task output:")[1].strip()
-        elif line.startswith("[Commit Message Suggester] Task output:"):
-            suggested_commit_msg = line.split("[Commit Message Suggester] Task output:")[1].strip()
+    validation_result = ""
+    lines = result.split("\n")
+    for i in range(len(lines)):
+        if lines[i].startswith("[Code Analyzer] Task output:"):
+            analysis_result = lines[i + 1].strip()
+        elif lines[i].startswith("[Commit Message Suggester] Task output:"):
+            suggested_commit_msg = lines[i + 1].strip().strip('"')
+        elif lines[i].startswith("[Commit Validator] Task output:"):
+            validation_result = lines[i + 1].strip()
 
     print(f"Original commit message: {commit_msg}")
     print(f"Analysis of code changes: {analysis_result}")
     print(f"Suggested commit message: {suggested_commit_msg}")
+    print(f"Validation result: {validation_result}")
 
-    if not dry_run:
+    if not dry_run and validation_result == "Commit message is valid.":
         # Amend the last commit with the suggested message
         subprocess.check_call(['git', '-C', repo_path, 'commit', '--amend', '-m', suggested_commit_msg])
         print("Last commit message has been updated.")
