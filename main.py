@@ -13,7 +13,8 @@ dotenv_path = Path('.env')
 load_dotenv(dotenv_path=dotenv_path)
 
 # claude_llm = ChatAnthropic(model="claude-3-haiku-20240307", )
-claude_llm = ChatAnthropic(model="claude-3-sonnet-20240229", )
+# claude_llm = ChatAnthropic(model="claude-3-sonnet-20240229", )
+claude_llm = ChatAnthropic(model="claude-3-opus-20240229", )
 
 
 @tool("Commit Message Validator")
