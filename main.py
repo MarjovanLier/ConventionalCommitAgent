@@ -111,16 +111,22 @@ def main(repo_path=None, dry_run=False):
     code_analyser = Agent(
         role='Code Change Summariser',
         goal="""
-            Concisely summarise the key aspects of the code modifications. Highlight added, removed, 
-            or updated functionality. Aim for a high-level overview that captures the essence.
-            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-            Old Commit Message:
-            {commit_msg}
-            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-            Commit Diff:
-            {commit_diff}
-            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-            """,
+        Summarise key aspects of code changes
+
+        Provide a concise, high-level overview of the modifications, focusing on:
+        - Added functionality
+        - Removed functionality
+        - Updated functionality
+
+        Capture the essence of the changes in a clear and focused summary.
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        Old Commit Message:
+        {commit_msg}
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        Commit Diff:
+        {commit_diff}
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        """,
         backstory="You excel at distilling complex code changes into their core components. Your summaries are renowned for their clarity and ability to convey the heart of the modifications.",
         verbose=True,
         memory=True,
@@ -130,17 +136,25 @@ def main(repo_path=None, dry_run=False):
     commit_suggester = Agent(
         role='Conventional Commit Craftsperson',
         goal="""
-            Compose a clear and descriptive commit message adhering to the conventional commit format.
-            Encapsulate the nature of the change in the type and description. Provide a concise yet 
-            informative summary in the subject line. When needed, elaborate further in the body.
-            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-            Old Commit Message:
-            {commit_msg}
-            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-            Commit Diff:
-            {commit_diff}
-            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-            """,
+        Compose a descriptive conventional commit message
+
+        Craft a commit message that:
+        - Adheres to the conventional commit format: `<type>[scope]: <description>`
+        - Encapsulates the nature of the change in the type and description
+        - Provides a concise yet informative summary in the subject line
+        - Elaborates further in the body when needed, explaining the 'why' and 'how'
+        - Maintains a line length of around 72 characters for readability
+        - Ensure UK English spelling and grammar are used
+
+        Ensure the commit message accurately reflects the changes and enhances the project's commit history.
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
+        Old Commit Message:
+        {commit_msg}
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        Commit Diff:  
+        {commit_diff}
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        """,
         backstory='With a deep understanding of clean commit practices, you craft messages that not only describe the change but also provide valuable context for future developers.',
         verbose=True,
         memory=True,
@@ -149,18 +163,14 @@ def main(repo_path=None, dry_run=False):
     )
 
     analyse_task = Task(
-        objective=f"Summarise key aspects of the code changes",
         description="Provide a high-level overview of the modifications, focusing on added, removed, or updated functionality",
-        expected_output="A clear and concise summary of the essential code changes",
-        result_format="A focused summary that captures the core of the code modifications",
+        expected_output="A clear and concise summary of the essential code changes, capturing the core of the modifications",
         agent=code_analyser,
     )
 
     suggest_task = Task(
-        objective="Compose a descriptive conventional commit message",
         description="Craft a commit message encapsulating the change type and key details, adhering to conventional commit standards",
-        expected_output="A well-structured conventional commit message accurately reflecting the changes",
-        result_format="A thoughtfully composed commit message that enhances the project's commit history",
+        expected_output="A well-structured conventional commit message that accurately reflects the changes and enhances the project's commit history",
         agent=commit_suggester,
     )
 
