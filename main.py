@@ -199,6 +199,23 @@ def main(repo_path=None, dry_run=False):
         llm=claude_llm
     )
 
+    external_validator = Agent(
+        role='External Best Practices Validator',
+        goal="""
+        Validate and enhance the commit message by ensuring it aligns with external best practices and team-specific conventions.
+
+        Review the suggested commit message and:
+        - Verify alignment with external coding and documentation standards
+        - Suggest enhancements for clarity, impact, and alignment with project goals
+        - Flag any issues or deviations from team-specific conventions
+        """,
+        backstory='You are the guardian of coding standards and best practices, ensuring every commit message not only meets conventional standards but also embodies the team’s ethos and project’s quality benchmarks.',
+        verbose=True,
+        memory=True,
+        allow_delegation=False,
+        llm=openai_llm
+    )
+
     analyse_task = Task(
         description="Provide a high-level overview of the modifications, focusing on added, removed, or updated functionality",
         expected_output="A clear and concise summary of the essential code changes, capturing the core of the modifications",
@@ -211,9 +228,15 @@ def main(repo_path=None, dry_run=False):
         agent=commit_suggester,
     )
 
+    external_validation_task = Task(
+        description="Review and enhance the commit message for alignment with external best practices and team conventions",
+        expected_output="Feedback on the commit message with suggestions for enhancements or flags for potential issues",
+        agent=external_validator,
+    )
+
     crew = Crew(
-        agents=[code_analyser, commit_suggester],
-        tasks=[analyse_task, suggest_task],
+        agents=[code_analyser, commit_suggester, external_validator],
+        tasks=[analyse_task, suggest_task, external_validation_task],
         verbose=True,
         llm=claude_llm
     )
