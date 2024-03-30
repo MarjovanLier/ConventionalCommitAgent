@@ -219,7 +219,19 @@ def main(repo_path=None, dry_run=False):
         verbose=True,
         memory=True,
         allow_delegation=False,
-        tools=[commit_message_validator],
+        llm=claude_llm
+    )
+
+    finalizer = Agent(
+        role='Commit Message Finalizer',
+        goal="""
+            Review the suggested commit message, incorporating feedback from code analysis, initial suggestion, and external validation tasks. 
+            Ensure the final message adheres to conventional commit standards, incorporates all necessary details, and aligns with best practices.
+            """,
+        backstory='With an exceptional eye for detail and a comprehensive understanding of project standards, you ensure every commit message is clear, concise, and in full compliance with all guidelines.',
+        verbose=True,
+        memory=True,
+        allow_delegation=False,
         llm=claude_llm
     )
 
@@ -246,9 +258,19 @@ def main(repo_path=None, dry_run=False):
         agent=external_validator,
     )
 
+    finalizing_task = Task(
+        description="""
+            Finalize the commit message, ensuring it is the best representation of the changes made. Adjust based on earlier analyses and validations, ensuring clarity, compliance, and conciseness.
+            """,
+        expected_output="""
+            The final, ready-to-use commit message that adheres to all project and conventional standards.
+            """,
+        agent=finalizer,
+    )
+
     crew = Crew(
-        agents=[code_analyser, commit_suggester, external_validator],
-        tasks=[analyse_task, suggest_task, external_validation_task],
+        agents=[code_analyser, commit_suggester, external_validator, finalizer],
+        tasks=[analyse_task, suggest_task, external_validation_task, finalizing_task],
         verbose=True,
         llm=claude_llm
     )
