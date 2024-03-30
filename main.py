@@ -35,57 +35,77 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
     suggestions = []
     lines = suggested_commit_msg.strip().split('\n')
 
-    if ':' not in lines[0]:
-        errors.append("Commit message must include a type followed by a colon (:).")
-    else:
-        type_part, description_part = lines[0].split(':', 1)
-        if '(' in type_part and ')' in type_part:
-            type_part, scope_part = type_part.split('(', 1)
+    def validate_type_and_scope(type_part: str, scope_part: str = None) -> None:
         if not type_part.islower():
             errors.append("Commit type must be lowercase.")
         valid_types = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert',
                        'security']
         if type_part not in valid_types:
             errors.append(f"Invalid commit type '{type_part}'. Valid types are: {', '.join(valid_types)}")
-        description_part = description_part.strip()
-        if description_part and not description_part[0].isupper():
-            suggestions.append("Commit description should start with a capital letter.")
+        if scope_part and not scope_part.endswith(')'):
+            errors.append("Scope must be wrapped in parentheses.")
+        if scope_part and not scope_part[:-1].isalnum():
+            errors.append("Scope must be a noun consisting of alphanumeric characters.")
 
-    # Validate subject line length
-    subject_line = lines[0]
-    if len(subject_line) > 50:
-        suggestions.append("Subject line should be limited to around 50 characters where possible.")
-    if subject_line.endswith('.'):
-        suggestions.append("Subject line should not end with a full stop.")
+    def validate_subject(subject_line: str) -> None:
+        if ':' not in subject_line:
+            errors.append("Commit message must include a type followed by a colon (:).")
+        else:
+            type_part, description_part = subject_line.split(':', 1)
+            if '(' in type_part and ')' in type_part:
+                type_part, scope_part = type_part.split('(', 1)
+                validate_type_and_scope(type_part, scope_part)
+            else:
+                validate_type_and_scope(type_part)
+            if type_part.endswith('!'):
+                type_part = type_part[:-1]
+                validate_type_and_scope(type_part)
+            description_part = description_part.strip()
+            if description_part and not description_part[0].isupper():
+                suggestions.append("Commit description should start with a capital letter.")
+        if len(subject_line) > 50:
+            suggestions.append("Subject line should be limited to around 50 characters where possible.")
+        if subject_line.endswith('.'):
+            suggestions.append("Subject line should not end with a full stop.")
 
-    # Validate body existence
-    if len(lines) < 3:
-        errors.append("Commit message should have a body providing more details about the changes.")
+    def validate_body(body_lines: list[str]) -> None:
+        if not body_lines:
+            errors.append("Commit message should have a body providing more details about the changes.")
+        for line in body_lines:
+            if len(line) > 72:
+                suggestions.append(
+                    f"Break up the line '{line}' to improve readability. Aim for around 72 characters per line.")
 
-    # Validate blank line between subject and body, if body exists
-    if len(lines) > 1 and lines[1] != "":
-        errors.append("There must be a blank line between the subject line and body.")
-
-    # Validate body lines length
-    body_lines = lines[2:]
-    for line in body_lines:
-        if len(line) > 72:
-            suggestions.append(
-                f"Break up the line '{line}' to improve readability. Aim for around 72 characters per line.")
-
-    # Validate breaking changes format
-    breaking_changes = [line for line in body_lines if line.startswith("BREAKING CHANGE:")]
-    if breaking_changes:
-        for change in breaking_changes:
-            if not change.startswith("BREAKING CHANGE:"):
-                errors.append("Breaking changes must start with 'BREAKING CHANGE:' for emphasis.")
-    else:
-        footer_lines = lines[-2:]
-        breaking_changes_footer = [line for line in footer_lines if line.startswith("BREAKING CHANGE:")]
-        if breaking_changes_footer:
-            for change in breaking_changes_footer:
+    def validate_breaking_changes(fn_lines: list[str]) -> None:
+        breaking_changes = [line for line in fn_lines if line.startswith("BREAKING CHANGE:")]
+        if breaking_changes:
+            for change in breaking_changes:
                 if not change.startswith("BREAKING CHANGE:"):
-                    errors.append("Breaking changes in the footer must start with 'BREAKING CHANGE:' for emphasis.")
+                    errors.append("Breaking changes must start with 'BREAKING CHANGE:' for emphasis.")
+
+    def validate_footers(footer_lines: list[str]) -> None:
+        for line in footer_lines:
+            if ':' in line:
+                token, _ = line.split(':', 1)
+                if not token.isalnum() or ' ' in token:
+                    errors.append(
+                        f"Footer token '{token}' must be a single word consisting of alphanumeric characters.")
+            elif '#' in line:
+                token, _ = line.split('#', 1)
+                if not token.isalnum() or ' ' in token:
+                    errors.append(
+                        f"Footer token '{token}' must be a single word consisting of alphanumeric characters.")
+            else:
+                errors.append(f"Invalid footer format: {line}")
+
+    validate_subject(lines[0])
+
+    if len(lines) > 1:
+        if lines[1] != "":
+            errors.append("There must be a blank line between the subject line and body.")
+        validate_body(lines[2:])
+        validate_breaking_changes(lines)
+        validate_footers(lines[-2:])
 
     return {
         "errors": errors,
