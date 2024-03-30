@@ -109,6 +109,48 @@ def pull_commit_messages_text_file(repo_path):
     return None
 
 
+def get_examples():
+    example1 = """feat(search): Add filtering options to search API
+
+- Introduce `filter` query parameter to search endpoint
+- Implement filtering functionality in `SearchService`
+- Update API documentation with details on using `filter`
+
+The search API now supports filtering results based on user-specified
+criteria. This enhancement improves the flexibility and usability of 
+the search feature."""
+
+    example2 = """fix(authentication): Resolve user login issues
+
+- Investigate and fix the bug causing intermittent login failures
+- Improve error handling and logging in the authentication module
+- Implement retry mechanism for failed login attempts
+
+The authentication process was occasionally failing due to a race
+condition in the user validation logic. The issue has been resolved by
+adding proper synchronization and error handling.
+
+Additionally, a retry mechanism has been introduced to handle transient
+network failures during login. If a login attempt fails due to a
+network issue, the system will automatically retry the request up to
+three times before reporting an error to the user.
+
+These changes significantly improve the reliability and user experience
+of the login feature."""
+
+    example3 = """feat(search): Add filtering options to search API
+
+- Introduce `filter` query parameter to search endpoint
+- Implement filtering functionality in `SearchService`
+- Update API documentation with details on using `filter`
+
+The search API now supports filtering results based on user-specified
+criteria. This enhancement improves the flexibility and usability of
+the search feature."""
+
+    return "Example 1:\n" + example1 + "\n\nExample 2:\n" + example2 + "\n\nExample 3:\n" + example3 + "\n\n"
+
+
 def get_last_commit_info(repo_path):
     """Get the last commit message and changes from the git repository at the given path"""
     try:
@@ -136,6 +178,8 @@ def main(repo_path=None, dry_run=False):
     if commit_msg is None or commit_diff is None:
         print("Unable to get last commit information")
         return
+
+    examples = get_examples()
 
     code_analyser = Agent(
         role='Code Change Summariser',
@@ -184,6 +228,9 @@ def main(repo_path=None, dry_run=False):
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
         Commit Diff:  
         {commit_diff}
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        Examples:
+        {examples}
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-""",
         backstory='With a deep understanding of clean commit practices, you craft messages that not only describe the change but also provide valuable context for future developers.',
         verbose=True,
@@ -280,6 +327,7 @@ def main(repo_path=None, dry_run=False):
             'commit_diff': commit_diff,
             'commit_msg': commit_msg,
             'commit_messages': commit_messages,
+            'examples': examples.strip(),
         },
     )
 
