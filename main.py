@@ -4,7 +4,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from crewai import Agent, Task, Crew
+from crewai import Agent, Task, Crew, Process
 from crewai_tools import tool
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
@@ -25,92 +25,126 @@ claude_llm_low = ChatAnthropic(model="claude-3-haiku-20240307", temperature=0)
 openai_llm = ChatOpenAI(model="gpt-4-turbo-preview", temperature=0)
 
 
-@tool("Commit Message Validator")
+@tool("Conventional Commit Message Validator")
 def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] | bool]:
     """
-    Validates the suggested commit message against best practices for conventional commits,
-    focusing on structure, subject line, body comprehensiveness, and breaking changes.
+    Use this tool to validate that a suggested commit message follows the Conventional Commits 1.0.0 specification.
+
+    The Conventional Commits specification is a lightweight convention on top of commit messages, which provides an easy set of rules for creating an explicit commit history. Enforcing this convention leads to more readable messages that are easier to follow when looking through the project history.
+
+    The tool checks the message for:
+    - Proper structure of type[(scope)][!]: description
+    - Allowed types (feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert)
+    - Valid scope format (lowercase, parentheses)
+    - Breaking changes indicator (!)
+    - Subject line max length (50 chars) and formatting (lowercase type, scope, and bang)
+    - Blank line between subject and body
+    - Line lengths in body and footers (max 72 chars)
+    - Formatting of breaking changes (BREAKING CHANGE: description)
+    - Formatting of footers (TOKEN: value or KEYWORD #123)
+
+    The tool returns a dictionary with:
+    - errors: a list of any structural errors found
+    - suggestions: a list of suggestions for improving the message
+    - is_valid: a boolean indicating if the message is fully valid
+
+    Use this tool to ensure your commit messages are consistent and informative according to the Conventional Commits 1.0.0 spec.
+    See https://www.conventionalcommits.org/en/v1.0.0/ for full specification details.
     """
     errors = []
     suggestions = []
+    valid_types = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert']
     lines = suggested_commit_msg.strip().split('\n')
+    subject_line = lines[0]
+    stripped_lines = [line.strip() for line in lines]
 
-    def validate_type_and_scope(type_part: str, scope_part: str = None) -> None:
-        if not type_part.islower():
-            errors.append("Commit type must be lowercase.")
-        valid_types = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert',
-                       'security']
-        if type_part not in valid_types:
-            errors.append(f"Invalid commit type '{type_part}'. Valid types are: {', '.join(valid_types)}")
-        if scope_part and not scope_part.endswith(')'):
-            errors.append("Scope must be wrapped in parentheses.")
-        if scope_part and not scope_part[:-1].isalnum():
-            errors.append("Scope must be a noun consisting of alphanumeric characters.")
+    breaking_change_footer_present = False
+    has_blank_line = any(line.strip() == "" for line in stripped_lines[1:])
 
-    def validate_subject(subject_line: str) -> None:
-        if ':' not in subject_line:
-            errors.append("Commit message must include a type followed by a colon (:).")
-        else:
-            type_part, description_part = subject_line.split(':', 1)
-            if '(' in type_part and ')' in type_part:
-                type_part, scope_part = type_part.split('(', 1)
-                validate_type_and_scope(type_part, scope_part)
-            else:
-                validate_type_and_scope(type_part)
-            if type_part.endswith('!'):
-                type_part = type_part[:-1]
-                validate_type_and_scope(type_part)
-            description_part = description_part.strip()
-            if description_part and not description_part[0].isupper():
-                suggestions.append("Commit description should start with a capital letter.")
+    if not subject_line:
+        errors.append("Subject line cannot be empty.")
+    elif ':' not in subject_line:
+        errors.append(
+            "Subject line must contain a type, optional scope, and description separated by a colon and space.")
+    else:
+        type_scope, _, description = subject_line.partition(':')
+        type_scope = type_scope.replace('!', '')  # Remove '!' for further processing
+        type_part, _, scope_part = type_scope.partition('(')
+        scope_part = scope_part[:-1] if scope_part.endswith(')') else scope_part  # Remove closing parenthesis
+
+        def add_error(error_message: str):
+            errors.append(error_message)
+
+        if not type_part:
+            add_error("Missing or invalid commit type. Commit type must be one of the allowed types.")
+        elif not type_part.islower():
+            add_error("Type should be lowercase.")
+
+        if scope_part and not scope_part.islower():
+            add_error("Scope should be lowercase.")
+
+        if type_part and type_part not in valid_types:
+            add_error(
+                f"Invalid commit type '{type_part}'. Commit type must be one of the allowed types: {', '.join(valid_types)}.")
+
+        if not description.strip():
+            add_error(
+                "Missing commit description. Please provide a clear and concise summary of the changes made in the commit. The description should briefly explain the purpose and impact of the modifications.")
+
         if len(subject_line) > 50:
-            suggestions.append("Subject line should be limited to around 50 characters where possible.")
-        if subject_line.endswith('.'):
-            suggestions.append("Subject line should not end with a full stop.")
+            add_error(
+                f"Subject line should be 50 characters or less, currently it is {len(subject_line)} characters. Consider rephrasing the subject to be more concise whilst still capturing the essence of the changes.")
 
-    def validate_body(body_lines: list[str]) -> None:
-        if not body_lines:
-            errors.append("Commit message should have a body providing more details about the changes.")
-        for line in body_lines:
-            if len(line) > 72:
-                suggestions.append(
-                    f"Break up the line '{line}' to improve readability. Aim for around 72 characters per line.")
+        if description.strip() and not description.strip()[0].isupper():
+            suggestions.append(
+                "Consider capitalising the first letter of the commit subject for consistency and readability, unless it starts with a lowercase identifier or acronym.")
 
-    def validate_breaking_changes(fn_lines: list[str]) -> None:
-        breaking_changes = [line for line in fn_lines if line.startswith("BREAKING CHANGE:")]
-        if breaking_changes:
-            for change in breaking_changes:
-                if not change.startswith("BREAKING CHANGE:"):
-                    errors.append("Breaking changes must start with 'BREAKING CHANGE:' for emphasis.")
+        if description.strip() and not description.strip().startswith(
+                ('Add', 'Update', 'Remove', 'Fix', 'Refactor', 'Improve', 'Use', 'Replace',
+                 'Modify', 'Rename', 'Move', 'Change', 'Enhance', 'Drop', 'Correct', 'Prevent', 'Resolve')):
+            suggestions.append(
+                "Consider using the imperative mood in the commit subject, e.g., 'Add feature' instead of 'Added feature'. This convention helps maintain a consistent style and tone across commit messages.")
 
-    def validate_footers(footer_lines: list[str]) -> None:
-        for line in footer_lines:
-            if ':' in line:
-                token, _ = line.split(':', 1)
-                if not token.isalnum() or ' ' in token:
-                    errors.append(
-                        f"Footer token '{token}' must be a single word consisting of alphanumeric characters.")
-            elif '#' in line:
-                token, _ = line.split('#', 1)
-                if not token.isalnum() or ' ' in token:
-                    errors.append(
-                        f"Footer token '{token}' must be a single word consisting of alphanumeric characters.")
+    footer_section = False
+    for line in stripped_lines[1:]:
+        if not footer_section and line == "":
+            footer_section = True
+            continue
+
+        if footer_section:
+            if line.startswith("BREAKING CHANGE:"):
+                breaking_change_footer_present = True
+            elif line.startswith(("BREAKING-CHANGE:", "BREAKING_CHANGE:")):
+                errors.append("Breaking change footer should start with 'BREAKING CHANGE:'.")
+            elif ": " in line:
+                footer_parts = line.split(": ", 1)
+                if not footer_parts[0].isupper() or " " in footer_parts[0]:
+                    if footer_parts[0] not in ["Reviewed-by", "Refs", "Closes"]:
+                        errors.append(
+                            f"Invalid footer format: {line}. Footer token should be uppercase, not contain spaces, and be one of the allowed tokens: 'BREAKING CHANGE', 'Reviewed-by', 'Refs', or 'Closes'."
+                        )
+            elif line.strip() and line.startswith(("Reviewed-by:", "Refs:", "Closes:")):
+                # Valid footer format
+                pass
             else:
-                errors.append(f"Invalid footer format: {line}")
+                # Not a footer, treat as part of the body
+                footer_section = False
 
-    validate_subject(lines[0])
+        if len(line) > 72:
+            suggestions.append(
+                f"Line '{line}' exceeds the recommended maximum length of 72 characters. To improve readability and maintainability, consider rewording the line to be more concise or breaking it into multiple shorter lines.")
 
-    if len(lines) > 1:
-        if lines[1] != "":
-            errors.append("There must be a blank line between the subject line and body.")
-        validate_body(lines[2:])
-        validate_breaking_changes(lines)
-        validate_footers(lines[-2:])
+    if not has_blank_line and len(stripped_lines) > 1:
+        errors.append(
+            "Missing blank line between the subject line and the commit body/footers. To adhere to the Conventional Commits specification, please add a blank line after the subject to visually separate it from the detailed commit description and any footers.")
+
+    if breaking_change_footer_present:
+        suggestions = [s for s in suggestions if not s.startswith("Consider adding a BREAKING CHANGE footer")]
 
     return {
         "errors": errors,
         "suggestions": suggestions,
-        "is_valid": len(errors) == 0 and len(suggestions) == 0
+        "is_valid": len(errors) == 0
     }
 
 
@@ -162,7 +196,7 @@ fix(authentication): Resolve user login issues
 
 The authentication process was occasionally failing due to a race
 condition in the user validation logic. The issue has been resolved by
-adding proper synchronization and error handling.
+adding proper synchronisation and error handling.
 
 Additionally, a retry mechanism has been introduced to handle transient
 network failures during login. If a login attempt fails due to a
@@ -231,8 +265,10 @@ def main(repo_path=None, dry_run=False):
 
             Capture the essence of the changes in a clear and focused summary. Ensure UK English spelling and grammar are used.
 
+            As the First Code Change Summariser, your role is to provide an initial summary of the code changes using the OpenAI GPT-4 model. This summary will be complemented by the Second Code Change Summariser, which uses the Claude model for a different perspective.
+
             -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-            Old Commit Message:
+            Current Commit Message:
             {commit_msg}
             -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
             Commit Diff:
@@ -257,8 +293,10 @@ def main(repo_path=None, dry_run=False):
 
             Capture the essence of the changes in a clear and focused summary. Ensure UK English spelling and grammar are used.
 
+            As the Second Code Change Summariser, your role is to provide a complementary summary of the code changes using the Claude model. This summary will offer a different perspective to the First Code Change Summariser, which uses the OpenAI GPT-4 model.
+
             -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-            Old Commit Message:
+            Current Commit Message:
             {commit_msg}
             -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
             Commit Diff:
@@ -268,26 +306,26 @@ def main(repo_path=None, dry_run=False):
         verbose=True,
         memory=True,
         allow_delegation=False,
-        llm=claude_llm_high
+        llm=claude_llm_medium
     )
 
     commit_suggester = Agent(
         role='Conventional Commit Craftsperson',
         goal="""
-        Compose a descriptive conventional commit message
+        Compose a descriptive conventional commit message based on the provided code changes and current commit message.
 
-        Craft a commit message that:
-        - Adheres to the conventional commit format: `<type>[scope]: <description>`
-        - Encapsulates the nature of the change in the type and description
-        - Provides a concise yet informative summary in the subject line
-        - Elaborates further in the body when needed, explaining the 'why' and 'how'
-        - Maintains a line length of around 72 characters for readability
-        - Ensure UK English spelling and grammar are used
+        Responsibilities:
+        - Generate a commit message that adheres to the conventional commit format: `<type>[scope]: <description>`
+        - Ensure the message encapsulates the nature of the change in the type and description
+        - Provide a concise yet informative summary in the subject line
+        - Elaborate further in the body when needed, explaining the 'why' and 'how'
+        - Maintain a line length of around 72 characters for readability
+        - Use UK English spelling and grammar
 
-        Ensure the commit message accurately reflects the changes and enhances the project's commit history.
-        
+        The commit message should accurately reflect the changes and enhance the project's commit history.
+
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
-        Old Commit Message:
+        Current Commit Message:
         {commit_msg}
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
         Commit Diff:  
@@ -309,18 +347,18 @@ def main(repo_path=None, dry_run=False):
         goal="""
         Validate the commit message to ensure it follows conventional commit message standards, aligns with external best practices, and adheres to team-specific conventions.
 
-        Review the suggested commit message to:
-        - Ensure it adheres to the conventional commit format: `<type>[optional scope]: <description>`
-        - Use the commit_message_validator tool to validate against conventional commit standards
-        - Verify alignment with external coding and documentation standards
+        Responsibilities:
+        - Review the suggested commit message to ensure compliance with conventional commit standards
+        - Use the commit_message_validator tool to validate the message structure and format
+        - Verify alignment with external coding and documentation best practices
         - Suggest enhancements for clarity, impact, and alignment with project goals
         - Flag any issues or deviations from team-specific conventions
         - Ensure UK English spelling and grammar are used
-
-        Incorporate a review of the message structure, type, scope, and description for compliance with conventional commit standards.
+    
+        This agent serves as a quality assurance step to validate the suggested commit message, ensuring it meets all necessary standards and conventions.
         
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
-        Old Commit Message:
+        Current Commit Message:
         {commit_msg}
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
         Commit Diff:  
@@ -329,7 +367,7 @@ def main(repo_path=None, dry_run=False):
         Best Practice examples:
         {examples}
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-""",
-        backstory='As the guardian of coding standards, best practices, and commit message integrity, you ensure every commit message not only meets conventional standards but also embodies the team’s ethos and project’s quality benchmarks.',
+        backstory='As the guardian of coding standards, best practices, and commit message integrity, you ensure every commit message not only meets conventional standards but also embodies the team\'s ethos and project\'s quality benchmarks.',
         verbose=True,
         memory=True,
         allow_delegation=True,
@@ -341,7 +379,15 @@ def main(repo_path=None, dry_run=False):
         role='Commit Message Finalizer',
         goal="""
             Review the suggested commit message, incorporating feedback from code analysis, initial suggestion, and external validation tasks. 
-            Ensure the final message adheres to conventional commit standards, incorporates all necessary details, and aligns with best practices.
+
+            Responsibilities:
+            - Ensure the final message adheres to conventional commit standards
+            - Incorporate all necessary details and context from the code analysis
+            - Address any issues or suggestions raised during the external validation step
+            - Maintain clarity, conciseness, and compliance with all guidelines
+            - Use UK English spelling and grammar
+
+            As the Commit Message Finalizer, your role is to review and incorporate feedback from previous steps to produce a polished, high-quality commit message that meets all project standards.
             """,
         backstory='With an exceptional eye for detail and a comprehensive understanding of project standards, you ensure every commit message is clear, concise, and in full compliance with all guidelines.',
         verbose=True,
@@ -381,7 +427,7 @@ def main(repo_path=None, dry_run=False):
 
     finalizing_task = Task(
         description="""
-            Finalize the commit message, ensuring it is the best representation of the changes made. Adjust based on earlier analyses and validations, ensuring clarity, compliance, and conciseness.
+            Finalise the commit message, ensuring it is the best representation of the changes made. Adjust based on earlier analyses and validations, ensuring clarity, compliance, and conciseness.
             """,
         expected_output="""
             The final, ready-to-use commit message that adheres to all project and conventional standards.
@@ -393,7 +439,20 @@ def main(repo_path=None, dry_run=False):
         agents=[first_code_analyser, second_code_analyser, commit_suggester, external_validator, finalizer],
         tasks=[first_analyse_task, second_analyse_task, suggest_task, external_validation_task, finalizing_task],
         verbose=True,
-        llm=claude_llm_high
+        llm=claude_llm_high,
+        process=Process.sequential,
+        manager_llm=ChatOpenAI(model="gpt-4"),
+        description="""
+        This crew is responsible for analysing code changes, generating a conventional commit message, validating it against best practices, and finalising the message.
+
+        The workflow is as follows:
+        1. Two code analysers (using OpenAI GPT-4 and Claude models) provide complementary summaries of the code changes
+        2. A commit message suggester crafts a conventional commit message based on the code changes and current message
+        3. An external validator checks the suggested message against conventional commit standards and best practices
+        4. A finalizer incorporates feedback from all previous steps to produce a polished, high-quality commit message
+
+        The crew follows a sequential process, with a manager (using GPT-4) overseeing the workflow and ensuring smooth collaboration between agents.
+        """
     )
 
     result = crew.kickoff(
