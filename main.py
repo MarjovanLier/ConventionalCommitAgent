@@ -110,7 +110,9 @@ def pull_commit_messages_text_file(repo_path):
 
 
 def get_examples():
-    example1 = """feat(search): Add filtering options to search API
+    example1 = """Commit: 7058c7a9cc55e2dd81ea53ac401c98d48b394418
+    ```md
+    feat(search): Add filtering options to search API
 
 - Introduce `filter` query parameter to search endpoint
 - Implement filtering functionality in `SearchService`
@@ -118,9 +120,12 @@ def get_examples():
 
 The search API now supports filtering results based on user-specified
 criteria. This enhancement improves the flexibility and usability of 
-the search feature."""
+the search feature.
+```"""
 
-    example2 = """fix(authentication): Resolve user login issues
+    example2 = """Commit: 4d7a1c0b2e8f6h5i9j3k7l1m2n3o4p5q6r7s8t9u
+```md
+fix(authentication): Resolve user login issues
 
 - Investigate and fix the bug causing intermittent login failures
 - Improve error handling and logging in the authentication module
@@ -136,9 +141,12 @@ network issue, the system will automatically retry the request up to
 three times before reporting an error to the user.
 
 These changes significantly improve the reliability and user experience
-of the login feature."""
+of the login feature.
+```"""
 
-    example3 = """feat(search): Add filtering options to search API
+    example3 = """Commit: 7058c7a9cc55e2dd81ea53ac401c98d48b394418
+```md
+feat(search): Add filtering options to search API
 
 - Introduce `filter` query parameter to search endpoint
 - Implement filtering functionality in `SearchService`
@@ -146,7 +154,8 @@ of the login feature."""
 
 The search API now supports filtering results based on user-specified
 criteria. This enhancement improves the flexibility and usability of
-the search feature."""
+the search feature.
+```"""
 
     return "Example 1:\n" + example1 + "\n\nExample 2:\n" + example2 + "\n\nExample 3:\n" + example3 + "\n\n"
 
@@ -229,7 +238,7 @@ def main(repo_path=None, dry_run=False):
         Commit Diff:  
         {commit_diff}
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-        Examples:
+        Best Practice examples:
         {examples}
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-""",
         backstory='With a deep understanding of clean commit practices, you craft messages that not only describe the change but also provide valuable context for future developers.',
@@ -261,6 +270,9 @@ def main(repo_path=None, dry_run=False):
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
         Commit Diff:  
         {commit_diff}
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        Best Practice examples:
+        {examples}
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-""",
         backstory='As the guardian of coding standards, best practices, and commit message integrity, you ensure every commit message not only meets conventional standards but also embodies the team’s ethos and project’s quality benchmarks.',
         verbose=True,
