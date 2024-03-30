@@ -13,10 +13,8 @@ from langchain_openai import ChatOpenAI
 dotenv_path = Path('.env')
 load_dotenv(dotenv_path=dotenv_path)
 
-# claude_llm = ChatAnthropic(model="claude-3-haiku-20240307", )
-# claude_llm = ChatAnthropic(model="claude-3-sonnet-20240229", )
-claude_llm = ChatAnthropic(model="claude-3-opus-20240229", )
-openai_llm = ChatOpenAI(model="gpt-4-turbo-preview", )
+claude_llm = ChatAnthropic(model="claude-3-opus-20240229", temperature=0)
+openai_llm = ChatOpenAI(model="gpt-4-turbo-preview", temperature=0)
 
 
 @tool("Commit Message Validator")
@@ -149,18 +147,20 @@ def main(repo_path=None, dry_run=False):
         - Removed functionality
         - Updated functionality
 
-        Capture the essence of the changes in a clear and focused summary.
+        Capture the essence of the changes in a clear and focused summary. Ensure UK English spelling and grammar are used.
+        
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
         Old Commit Message:
         {commit_msg}
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
         Commit Diff:
-        {commit_diff}""",
+        {commit_diff}
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-""",
         backstory="You excel at distilling complex code changes into their core components. Your summaries are renowned for their clarity and ability to convey the heart of the modifications.",
         verbose=True,
         memory=True,
         allow_delegation=False,
-        llm=claude_llm
+        llm=openai_llm
     )
 
     commit_suggester = Agent(
@@ -177,12 +177,14 @@ def main(repo_path=None, dry_run=False):
         - Ensure UK English spelling and grammar are used
 
         Ensure the commit message accurately reflects the changes and enhances the project's commit history.
+        
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
         Old Commit Message:
         {commit_msg}
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
         Commit Diff:  
-        {commit_diff}""",
+        {commit_diff}
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-""",
         backstory='With a deep understanding of clean commit practices, you craft messages that not only describe the change but also provide valuable context for future developers.',
         verbose=True,
         memory=True,
@@ -194,18 +196,31 @@ def main(repo_path=None, dry_run=False):
     external_validator = Agent(
         role='External Best Practices Validator',
         goal="""
-        Validate and enhance the commit message by ensuring it aligns with external best practices and team-specific conventions.
+        Validate the commit message to ensure it follows conventional commit message standards, aligns with external best practices, and adheres to team-specific conventions.
 
-        Review the suggested commit message and:
+        Review the suggested commit message to:
+        - Ensure it adheres to the conventional commit format: `<type>[optional scope]: <description>`
+        - Use the commit_message_validator tool to validate against conventional commit standards
         - Verify alignment with external coding and documentation standards
         - Suggest enhancements for clarity, impact, and alignment with project goals
         - Flag any issues or deviations from team-specific conventions
-        """,
-        backstory='You are the guardian of coding standards and best practices, ensuring every commit message not only meets conventional standards but also embodies the team’s ethos and project’s quality benchmarks.',
+        - Ensure UK English spelling and grammar are used
+
+        Incorporate a review of the message structure, type, scope, and description for compliance with conventional commit standards.
+        
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
+        Old Commit Message:
+        {commit_msg}
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        Commit Diff:  
+        {commit_diff}
+        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-""",
+        backstory='As the guardian of coding standards, best practices, and commit message integrity, you ensure every commit message not only meets conventional standards but also embodies the team’s ethos and project’s quality benchmarks.',
         verbose=True,
         memory=True,
         allow_delegation=False,
-        llm=openai_llm
+        tools=[commit_message_validator],
+        llm=claude_llm
     )
 
     analyse_task = Task(
@@ -221,8 +236,13 @@ def main(repo_path=None, dry_run=False):
     )
 
     external_validation_task = Task(
-        description="Review and enhance the commit message for alignment with external best practices and team conventions",
-        expected_output="Feedback on the commit message with suggestions for enhancements or flags for potential issues",
+        description="""
+        Validate and enhance the commit message to ensure it aligns with conventional commit standards, external best practices, and team conventions.
+        Provide detailed feedback on the commit message structure, suggesting improvements and flagging any potential issues.
+        """,
+        expected_output="""
+        Feedback on the commit message with validation against conventional commit standards, suggestions for enhancements, and flags for potential issues.
+        """,
         agent=external_validator,
     )
 
