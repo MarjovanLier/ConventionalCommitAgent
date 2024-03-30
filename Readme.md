@@ -27,8 +27,16 @@ the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) speci
 2. Navigate to the project directory:
    cd ConventionalCommitAgent
 
-3. Build and run the Docker container using Docker Compose:
-   docker-compose up --build
+3. Copy the `.env.example` file to `.env` and update it with your actual environment variables:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+4. Build and run the Docker container using Docker Compose:
+   ```bash
+   docker-compose up --build`
+   ```
    This command will build the Docker image based on the provided Dockerfile and start the container.
 
 ## Contributing
