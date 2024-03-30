@@ -70,7 +70,8 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
     body_lines = lines[2:]
     for line in body_lines:
         if len(line) > 72:
-            suggestions.append(f"Break up the line '{line}' to improve readability. Aim for around 72 characters per line.")
+            suggestions.append(
+                f"Break up the line '{line}' to improve readability. Aim for around 72 characters per line.")
 
     # Validate breaking changes format
     breaking_changes = [line for line in body_lines if line.startswith("BREAKING CHANGE:")]
@@ -220,7 +221,7 @@ def main(repo_path=None, dry_run=False):
         backstory="You excel at distilling complex code changes into their core components. Your summaries are renowned for their clarity and ability to convey the heart of the modifications.",
         verbose=True,
         memory=True,
-        allow_delegation=False,
+        allow_delegation=True,
         llm=openai_llm
     )
 
@@ -246,7 +247,7 @@ def main(repo_path=None, dry_run=False):
         backstory="You excel at distilling complex code changes into their core components. Your summaries are renowned for their clarity and ability to convey the heart of the modifications.",
         verbose=True,
         memory=True,
-        allow_delegation=False,
+        allow_delegation=True,
         llm=claude_llm_high
     )
 
@@ -278,7 +279,7 @@ def main(repo_path=None, dry_run=False):
         backstory='With a deep understanding of clean commit practices, you craft messages that not only describe the change but also provide valuable context for future developers.',
         verbose=True,
         memory=True,
-        allow_delegation=False,
+        allow_delegation=True,
         tools=[commit_message_validator],
         llm=claude_llm_low
     )
