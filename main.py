@@ -13,7 +13,15 @@ from langchain_openai import ChatOpenAI
 dotenv_path = Path('.env')
 load_dotenv(dotenv_path=dotenv_path)
 
-claude_llm = ChatAnthropic(model="claude-3-opus-20240229", temperature=0)
+# High-performance model for complex tasks, most expensive
+claude_llm_high = ChatAnthropic(model="claude-3-opus-20240229", temperature=0)
+
+# Balanced model for general use, moderately priced
+claude_llm_medium = ChatAnthropic(model="claude-3-sonnet-20240229", temperature=0)
+
+# Fastest model for quick responses, most affordable
+claude_llm_low = ChatAnthropic(model="claude-3-haiku-20240307", temperature=0)
+
 openai_llm = ChatOpenAI(model="gpt-4-turbo-preview", temperature=0)
 
 
@@ -246,7 +254,7 @@ def main(repo_path=None, dry_run=False):
         memory=True,
         allow_delegation=False,
         tools=[commit_message_validator],
-        llm=claude_llm
+        llm=claude_llm_low
     )
 
     external_validator = Agent(
@@ -277,8 +285,9 @@ def main(repo_path=None, dry_run=False):
         backstory='As the guardian of coding standards, best practices, and commit message integrity, you ensure every commit message not only meets conventional standards but also embodies the team’s ethos and project’s quality benchmarks.',
         verbose=True,
         memory=True,
-        allow_delegation=False,
-        llm=claude_llm
+        allow_delegation=True,
+        tools=[commit_message_validator],
+        llm=claude_llm_medium
     )
 
     finalizer = Agent(
@@ -290,8 +299,8 @@ def main(repo_path=None, dry_run=False):
         backstory='With an exceptional eye for detail and a comprehensive understanding of project standards, you ensure every commit message is clear, concise, and in full compliance with all guidelines.',
         verbose=True,
         memory=True,
-        allow_delegation=False,
-        llm=claude_llm
+        allow_delegation=True,
+        llm=claude_llm_high
     )
 
     analyse_task = Task(
@@ -331,7 +340,7 @@ def main(repo_path=None, dry_run=False):
         agents=[code_analyser, commit_suggester, external_validator, finalizer],
         tasks=[analyse_task, suggest_task, external_validation_task, finalizing_task],
         verbose=True,
-        llm=claude_llm
+        llm=claude_llm_high
     )
 
     result = crew.kickoff(
