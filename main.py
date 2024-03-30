@@ -241,7 +241,7 @@ def main(repo_path=None, dry_run=False):
         backstory="You excel at distilling complex code changes into their core components. Your summaries are renowned for their clarity and ability to convey the heart of the modifications.",
         verbose=True,
         memory=True,
-        allow_delegation=True,
+        allow_delegation=False,
         llm=openai_llm
     )
 
@@ -267,7 +267,7 @@ def main(repo_path=None, dry_run=False):
         backstory="You excel at distilling complex code changes into their core components. Your summaries are renowned for their clarity and ability to convey the heart of the modifications.",
         verbose=True,
         memory=True,
-        allow_delegation=True,
+        allow_delegation=False,
         llm=claude_llm_high
     )
 
