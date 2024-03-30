@@ -81,7 +81,7 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
     return {
         "errors": errors,
         "suggestions": suggestions,
-        "is_valid": len(errors) == 0
+        "is_valid": len(errors) == 0 and len(suggestions) == 0
     }
 
 
