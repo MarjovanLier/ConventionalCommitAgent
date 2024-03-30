@@ -35,7 +35,7 @@ the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) speci
 
 4. Build and run the Docker container using Docker Compose:
    ```bash
-   docker-compose up --build`
+   docker-compose up --build
    ```
    This command will build the Docker image based on the provided Dockerfile and start the container.
 
