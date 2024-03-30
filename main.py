@@ -70,7 +70,7 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
     body_lines = lines[2:]
     for line in body_lines:
         if len(line) > 72:
-            suggestions.append(f"Consider breaking up the line '{line}' to improve readability.")
+            suggestions.append(f"Break up the line '{line}' to improve readability. Aim for around 72 characters per line.")
 
     # Validate breaking changes format
     breaking_changes = [line for line in body_lines if line.startswith("BREAKING CHANGE:")]
@@ -173,7 +173,7 @@ def get_last_commit_info(repo_path):
     try:
         commit_msg = subprocess.check_output(['git', '-C', repo_path, 'log', '-1', '--pretty=%B']).decode(
             'utf-8').strip()
-        commit_diff = subprocess.check_output(['git', '-C', repo_path, 'diff', 'HEAD^', 'HEAD']).decode('utf-8')
+        commit_diff = subprocess.check_output(['git', '-C', repo_path, 'diff', '-U5', 'HEAD^', 'HEAD']).decode('utf-8')
 
         commit_messages = pull_commit_messages_text_file(repo_path)
 
@@ -198,30 +198,56 @@ def main(repo_path=None, dry_run=False):
 
     examples = get_examples()
 
-    code_analyser = Agent(
-        role='Code Change Summariser',
+    first_code_analyser = Agent(
+        role='First Code Change Summariser',
         goal="""
-        Summarise key aspects of code changes
+            Summarise key aspects of code changes
 
-        Provide a concise, high-level overview of the modifications, focusing on:
-        - Added functionality
-        - Removed functionality
-        - Updated functionality
+            Provide a concise, high-level overview of the modifications, focusing on:
+            - Added functionality
+            - Removed functionality
+            - Updated functionality
 
-        Capture the essence of the changes in a clear and focused summary. Ensure UK English spelling and grammar are used.
-        
-        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-        Old Commit Message:
-        {commit_msg}
-        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-        Commit Diff:
-        {commit_diff}
-        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-""",
+            Capture the essence of the changes in a clear and focused summary. Ensure UK English spelling and grammar are used.
+
+            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+            Old Commit Message:
+            {commit_msg}
+            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+            Commit Diff:
+            {commit_diff}
+            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-""",
         backstory="You excel at distilling complex code changes into their core components. Your summaries are renowned for their clarity and ability to convey the heart of the modifications.",
         verbose=True,
         memory=True,
         allow_delegation=False,
         llm=openai_llm
+    )
+
+    second_code_analyser = Agent(
+        role='Second Code Change Summariser',
+        goal="""
+            Summarise key aspects of code changes
+
+            Provide a concise, high-level overview of the modifications, focusing on:
+            - Added functionality
+            - Removed functionality
+            - Updated functionality
+
+            Capture the essence of the changes in a clear and focused summary. Ensure UK English spelling and grammar are used.
+
+            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+            Old Commit Message:
+            {commit_msg}
+            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+            Commit Diff:
+            {commit_diff}
+            -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-""",
+        backstory="You excel at distilling complex code changes into their core components. Your summaries are renowned for their clarity and ability to convey the heart of the modifications.",
+        verbose=True,
+        memory=True,
+        allow_delegation=False,
+        llm=claude_llm_high
     )
 
     commit_suggester = Agent(
@@ -303,10 +329,16 @@ def main(repo_path=None, dry_run=False):
         llm=claude_llm_high
     )
 
-    analyse_task = Task(
+    first_analyse_task = Task(
         description="Provide a high-level overview of the modifications, focusing on added, removed, or updated functionality",
         expected_output="A clear and concise summary of the essential code changes, capturing the core of the modifications",
-        agent=code_analyser,
+        agent=first_code_analyser,
+    )
+
+    second_analyse_task = Task(
+        description="Provide a high-level overview of the modifications, focusing on added, removed, or updated functionality",
+        expected_output="A clear and concise summary of the essential code changes, capturing the core of the modifications",
+        agent=second_code_analyser,
     )
 
     suggest_task = Task(
@@ -337,8 +369,8 @@ def main(repo_path=None, dry_run=False):
     )
 
     crew = Crew(
-        agents=[code_analyser, commit_suggester, external_validator, finalizer],
-        tasks=[analyse_task, suggest_task, external_validation_task, finalizing_task],
+        agents=[first_code_analyser, second_code_analyser, commit_suggester, external_validator, finalizer],
+        tasks=[first_analyse_task, second_analyse_task, suggest_task, external_validation_task, finalizing_task],
         verbose=True,
         llm=claude_llm_high
     )
