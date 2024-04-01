@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import textwrap
 import time
 from pathlib import Path
 
@@ -24,6 +25,18 @@ claude_llm_medium = ChatAnthropic(model="claude-3-sonnet-20240229", temperature=
 claude_llm_low = ChatAnthropic(model="claude-3-haiku-20240307", temperature=0)
 
 openai_llm = ChatOpenAI(model="gpt-4-turbo-preview", temperature=0)
+
+
+def wrap_text(input_text, width=72):
+    """Wrap text to a specified width, handling bullet points with indentation"""
+    intput_lines = input_text.split('\n')
+    wrapped_lines = []
+    for line in intput_lines:
+        if line.startswith('- '):  # This is a bullet point
+            wrapped_lines.append('\n'.join(textwrap.wrap(line, width, subsequent_indent='  ')))
+        else:  # This is not a bullet point
+            wrapped_lines.append('\n'.join(textwrap.wrap(line, width)))
+    return '\n'.join(wrapped_lines)
 
 
 @tool("Conventional Commit Message Validator")
@@ -136,8 +149,11 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
                 footer_section = False
 
         if len(line) > 72:
-            suggestions.append(
+            wrapped_line = textwrap.wrap(line, 72)
+            errors.append(
                 f"Line '{line}' exceeds the recommended maximum length of 72 characters. To improve readability and maintainability, consider rewording the line to be more concise or breaking it into multiple shorter lines.")
+            suggestions.append(
+                f"Consider breaking up '{line}' into multiple lines like the following:\n{wrapped_line}")
 
     if not has_blank_line and len(stripped_lines) > 1:
         errors.append(
