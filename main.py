@@ -29,9 +29,9 @@ openai_llm = ChatOpenAI(model="gpt-4-turbo-preview", temperature=0)
 
 def wrap_text(input_text, width=72):
     """Wrap text to a specified width, handling bullet points with indentation"""
-    intput_lines = input_text.split('\n')
+    input_lines = input_text.split('\n')
     wrapped_lines = []
-    for line in intput_lines:
+    for line in input_lines:
         if line.startswith('- '):  # This is a bullet point
             wrapped_lines.append('\n'.join(textwrap.wrap(line, width, subsequent_indent='  ')))
         else:  # This is not a bullet point
@@ -150,6 +150,7 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
 
         if len(line) > 72:
             wrapped_line = textwrap.wrap(line, 72)
+            wrapped_line = '\n'.join(wrapped_line)
             errors.append(
                 f"Line '{line}' exceeds the recommended maximum length of 72 characters. To improve readability and maintainability, consider rewording the line to be more concise or breaking it into multiple shorter lines.")
             suggestions.append(
