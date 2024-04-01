@@ -469,23 +469,12 @@ def main(repo_path=None, dry_run=False):
 
     # Initialize the crew with agents, tasks, and process configuration
     crew = Crew(
-        agents=[first_code_analyser, second_code_analyser, commit_suggester, external_validator, finalizer],
         tasks=[first_analyse_task, second_analyse_task, suggest_task, external_validation_task, finalizing_task],
-        verbose=True,
-        llm=claude_llm_high,
-        process=Process.sequential,
+        agents=[first_code_analyser, second_code_analyser, commit_suggester, external_validator, finaliser],
         manager_llm=ChatOpenAI(model="gpt-4"),
-        description="""
-        This crew is responsible for analysing code changes, generating a conventional commit message, validating it against best practices, and finalising the message.
-
-        The workflow is as follows:
-        1. Two code analysers (using OpenAI GPT-4 and Claude models) provide complementary summaries of the code changes
-        2. A commit message suggester crafts a conventional commit message based on the code changes and current message
-        3. An external validator checks the suggested message against conventional commit standards and best practices
-        4. A finalizer incorporates feedback from all previous steps to produce a polished, high-quality commit message
-
-        The crew follows a sequential process, with a manager (using GPT-4) overseeing the workflow and ensuring smooth collaboration between agents.
-        """
+        process=Process.sequential,
+        verbose=True,
+        share_crew=False,
     )
 
     # Kick off the crew with the necessary inputs
