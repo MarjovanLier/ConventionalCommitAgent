@@ -354,9 +354,9 @@ def main(repo_path=None, dry_run=False):
         - Suggest enhancements for clarity, impact, and alignment with project goals
         - Flag any issues or deviations from team-specific conventions
         - Ensure conventions for UK English spelling, grammar, punctuation, and terminology are followed
-    
+
         This agent serves as a quality assurance step to validate the suggested commit message, ensuring it meets all necessary standards and conventions.
-        
+
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
         Current Commit Message:
         {commit_msg}
