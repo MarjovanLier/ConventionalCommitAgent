@@ -160,7 +160,7 @@ Closes #123"""
         commit_msg = "feat: this is a subject line that is over 50 characters long and should trigger an error"
         result = commit_message_validator.run(commit_msg)
         self.assertFalse(result['is_valid'])
-        self.assertIn("Subject line should be 50 characters or less, currently it is 88 characters. Consider rephrasing the subject to be more concise while still capturing the essence of the changes.", result['errors'])
+        self.assertIn("Subject line should be 50 characters or less, currently it is 88 characters. Consider rephrasing the subject to be more concise whilst still capturing the essence of the changes.", result['errors'])
 
     def test_valid_commit_message_with_valid_type_scope_and_description(self):
         commit_msg = "feat(search): Add filtering options to search API"
