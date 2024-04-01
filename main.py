@@ -263,7 +263,7 @@ def main(repo_path=None, dry_run=False):
             - Removed functionality
             - Updated functionality
 
-            Capture the essence of the changes in a clear and focused summary. Ensure UK English spelling and grammar are used.
+            Capture the essence of the changes in a clear and focused summary. Ensure conventions for UK English spelling, grammar, punctuation, and terminology are followed.
 
             As the First Code Change Summariser, your role is to provide an initial summary of the code changes using the OpenAI GPT-4 model. This summary will be complemented by the Second Code Change Summariser, which uses the Claude model for a different perspective.
 
@@ -291,7 +291,7 @@ def main(repo_path=None, dry_run=False):
             - Removed functionality
             - Updated functionality
 
-            Capture the essence of the changes in a clear and focused summary. Ensure UK English spelling and grammar are used.
+            Capture the essence of the changes in a clear and focused summary. Ensure conventions for UK English spelling, grammar, punctuation, and terminology are followed.
 
             As the Second Code Change Summariser, your role is to provide a complementary summary of the code changes using the Claude model. This summary will offer a different perspective to the First Code Change Summariser, which uses the OpenAI GPT-4 model.
 
@@ -353,7 +353,7 @@ def main(repo_path=None, dry_run=False):
         - Verify alignment with external coding and documentation best practices
         - Suggest enhancements for clarity, impact, and alignment with project goals
         - Flag any issues or deviations from team-specific conventions
-        - Ensure UK English spelling and grammar are used
+        - Ensure conventions for UK English spelling, grammar, punctuation, and terminology are followed
     
         This agent serves as a quality assurance step to validate the suggested commit message, ensuring it meets all necessary standards and conventions.
         
