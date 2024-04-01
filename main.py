@@ -302,7 +302,8 @@ def main(repo_path=None, dry_run=False):
         verbose=True,
         memory=True,
         allow_delegation=False,
-        llm=openai_llm
+        llm=openai_llm,
+        max_iterations=1,
     )
 
     second_code_analyser = Agent(
@@ -330,7 +331,8 @@ def main(repo_path=None, dry_run=False):
         verbose=True,
         memory=True,
         allow_delegation=False,
-        llm=claude_llm_medium
+        llm=claude_llm_medium,
+        max_iterations=1,
     )
 
     commit_suggester = Agent(
@@ -344,7 +346,8 @@ def main(repo_path=None, dry_run=False):
         - Provide a concise yet informative summary in the subject line
         - Elaborate further in the body when needed, explaining the 'why' and 'how'
         - Maintain a line length of around 72 characters for readability
-        - Use UK English spelling and grammar
+        - If the commit message is found to be invalid by the validator, revise the message based on the feedback and try again
+        - Ensure conventions for UK English spelling, grammar, punctuation, and terminology are followed
 
         The commit message should accurately reflect the changes and enhance the project's commit history.
 
@@ -377,6 +380,8 @@ def main(repo_path=None, dry_run=False):
         - Verify alignment with external coding and documentation best practices
         - Suggest enhancements for clarity, impact, and alignment with project goals
         - Flag any issues or deviations from team-specific conventions
+        - Provide clear and actionable feedback for improving the commit message if it doesn't meet the standards
+        - If the message is invalid, suggest specific changes that can be made to make it valid
         - Ensure conventions for UK English spelling, grammar, punctuation, and terminology are followed
 
         This agent serves as a quality assurance step to validate the suggested commit message, ensuring it meets all necessary standards and conventions.
@@ -399,8 +404,8 @@ def main(repo_path=None, dry_run=False):
         llm=claude_llm_medium
     )
 
-    finalizer = Agent(
-        role='Commit Message Finalizer',
+    finaliser = Agent(
+        role='Commit Message Finaliser',
         goal="""
             Review the suggested commit message, incorporating feedback from code analysis, initial suggestion, and external validation tasks. 
 
@@ -409,11 +414,13 @@ def main(repo_path=None, dry_run=False):
             - Incorporate all necessary details and context from the code analysis
             - Address any issues or suggestions raised during the external validation step
             - Maintain clarity, conciseness, and compliance with all guidelines
-            - Use UK English spelling and grammar
+            - If the message is found to be invalid, work with the other agents to iteratively improve it until it meets all standards
+            - Maintain clarity, conciseness, and compliance with all guidelines
+            - Use UK English spelling, grammar, punctuation, and terminology
 
-            As the Commit Message Finalizer, your role is to review and incorporate feedback from previous steps to produce a polished, high-quality commit message that meets all project standards.
+            As the Commit Message Finaliser, your role is to review and incorporate feedback from previous steps to produce a polished, high-quality commit message that meets all project standards.
             """,
-        backstory='With an exceptional eye for detail and a comprehensive understanding of project standards, you ensure every commit message is clear, concise, and in full compliance with all guidelines.',
+        backstory='As the Commit Message Finaliser, you take pride in delivering commit messages that meet the highest standards. You work tirelessly with the other agents, iterating and refining the message until it is deemed valid and in full compliance with all guidelines. Your meticulous attention to detail ensures that every commit message adheres to UK English conventions and project-specific requirements.',
         verbose=True,
         memory=True,
         allow_delegation=True,
@@ -457,7 +464,7 @@ def main(repo_path=None, dry_run=False):
         expected_output="""
             The final, ready-to-use commit message that adheres to all project and conventional standards.
             """,
-        agent=finalizer,
+        agent=finaliser,
     )
 
     # Initialize the crew with agents, tasks, and process configuration
