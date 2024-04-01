@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 
+# Load environment variables from .env file
 dotenv_path = Path('.env')
 load_dotenv(dotenv_path=dotenv_path)
 
@@ -61,6 +62,7 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
     breaking_change_footer_present = False
     has_blank_line = any(line.strip() == "" for line in stripped_lines[1:])
 
+    # Validate subject line
     if not subject_line:
         errors.append("Subject line cannot be empty.")
     elif ':' not in subject_line:
@@ -75,6 +77,7 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
         def add_error(error_message: str):
             errors.append(error_message)
 
+        # Validate type and scope
         if not type_part:
             add_error("Missing or invalid commit type. Commit type must be one of the allowed types.")
         elif not type_part.islower():
@@ -87,6 +90,7 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
             add_error(
                 f"Invalid commit type '{type_part}'. Commit type must be one of the allowed types: {', '.join(valid_types)}.")
 
+        # Validate description
         if not description.strip():
             add_error(
                 "Missing commit description. Please provide a clear and concise summary of the changes made in the commit. The description should briefly explain the purpose and impact of the modifications.")
@@ -105,6 +109,7 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
             suggestions.append(
                 "Consider using the imperative mood in the commit subject, e.g., 'Add feature' instead of 'Added feature'. This convention helps maintain a consistent style and tone across commit messages.")
 
+    # Validate body and footer
     footer_section = False
     for line in stripped_lines[1:]:
         if not footer_section and line == "":
@@ -158,7 +163,7 @@ def is_git_repo(path):
 
 
 def pull_commit_messages_text_file(repo_path):
-    """See if the file commit_messages.txt exists and it was changed in the last 10 minutes. If so, return the content"""
+    """Check if commit_messages.txt exists and was changed in the last 10 minutes. If so, return its content."""
     try:
         commit_messages_file = os.path.join(repo_path, 'commit_messages.txt')
         if os.path.exists(commit_messages_file):
@@ -173,6 +178,7 @@ def pull_commit_messages_text_file(repo_path):
 
 
 def get_examples():
+    """Return a string containing example commit messages"""
     example1 = """Commit: 7058c7a9cc55e2dd81ea53ac401c98d48b394418
     ```md
     feat(search): Add filtering options to search API
@@ -224,7 +230,7 @@ the search feature.
 
 
 def get_last_commit_info(repo_path):
-    """Get the last commit message and changes from the git repository at the given path"""
+    """Get the last commit message, diff, and commit_messages.txt content from the git repository at the given path"""
     try:
         commit_msg = subprocess.check_output(['git', '-C', repo_path, 'log', '-1', '--pretty=%B']).decode(
             'utf-8').strip()
@@ -239,6 +245,7 @@ def get_last_commit_info(repo_path):
 
 
 def main(repo_path=None, dry_run=False):
+    """Main function to analyze and suggest improvements to the last git commit message"""
     if repo_path is None:
         repo_path = os.getcwd()
 
@@ -253,6 +260,7 @@ def main(repo_path=None, dry_run=False):
 
     examples = get_examples()
 
+    # Initialize agents for code analysis, commit message suggestion, validation, and finalization
     first_code_analyser = Agent(
         role='First Code Change Summariser',
         goal="""
@@ -396,6 +404,7 @@ def main(repo_path=None, dry_run=False):
         llm=claude_llm_high
     )
 
+    # Define tasks for each agent
     first_analyse_task = Task(
         description="Provide a high-level overview of the modifications, focusing on added, removed, or updated functionality",
         expected_output="A clear and concise summary of the essential code changes, capturing the core of the modifications",
@@ -435,6 +444,7 @@ def main(repo_path=None, dry_run=False):
         agent=finalizer,
     )
 
+    # Initialize the crew with agents, tasks, and process configuration
     crew = Crew(
         agents=[first_code_analyser, second_code_analyser, commit_suggester, external_validator, finalizer],
         tasks=[first_analyse_task, second_analyse_task, suggest_task, external_validation_task, finalizing_task],
@@ -455,6 +465,7 @@ def main(repo_path=None, dry_run=False):
         """
     )
 
+    # Kick off the crew with the necessary inputs
     result = crew.kickoff(
         inputs={
             'commit_diff': commit_diff,
