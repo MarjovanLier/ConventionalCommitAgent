@@ -137,11 +137,11 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
             elif ": " in line:
                 footer_parts = line.split(": ", 1)
                 if not footer_parts[0].isupper() or " " in footer_parts[0]:
-                    if footer_parts[0] not in ["Reviewed-by", "Refs", "Closes"]:
+                    if footer_parts[0] not in ["Reviewed-by", "Refs", "Closes", "Signed-off-by"]:
                         errors.append(
-                            f"Invalid footer format: {line}. Footer token should be uppercase, not contain spaces, and be one of the allowed tokens: 'BREAKING CHANGE', 'Reviewed-by', 'Refs', or 'Closes'."
+                            f"Invalid footer format: {line}. Footer token should be uppercase, not contain spaces, and be one of the allowed tokens: 'BREAKING CHANGE', 'Reviewed-by', 'Refs', 'Closes', or 'Signed-off-by'."
                         )
-            elif line.strip() and line.startswith(("Reviewed-by:", "Refs:", "Closes:")):
+            elif line.strip() and line.startswith(("Reviewed-by:", "Refs:", "Closes:", "Signed-off-by:")):
                 # Valid footer format
                 pass
             else:
