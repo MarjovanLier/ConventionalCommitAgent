@@ -41,6 +41,11 @@
       "always",
       50
     ],
+    "subject-min-length": [
+      2,
+      "always",
+      10
+    ],
     "body-leading-blank": [
       2,
       "always"
@@ -53,6 +58,11 @@
       2,
       "always",
       72
+    ],
+    "header-min-length": [
+      2,
+      "always",
+      10
     ],
     "header-max-length": [
       2,
