@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import textwrap
 import time
 from pathlib import Path
 
@@ -24,6 +25,18 @@ claude_llm_medium = ChatAnthropic(model="claude-3-sonnet-20240229", temperature=
 claude_llm_low = ChatAnthropic(model="claude-3-haiku-20240307", temperature=0)
 
 openai_llm = ChatOpenAI(model="gpt-4-turbo-preview", temperature=0)
+
+
+def wrap_text(input_text, width=72):
+    """Wrap text to a specified width, handling bullet points with indentation"""
+    input_lines = input_text.split('\n')
+    wrapped_lines = []
+    for line in input_lines:
+        if line.startswith('- '):  # This is a bullet point
+            wrapped_lines.append('\n'.join(textwrap.wrap(line, width, subsequent_indent='  ')))
+        else:  # This is not a bullet point
+            wrapped_lines.append('\n'.join(textwrap.wrap(line, width)))
+    return '\n'.join(wrapped_lines)
 
 
 @tool("Conventional Commit Message Validator")
@@ -136,8 +149,12 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
                 footer_section = False
 
         if len(line) > 72:
-            suggestions.append(
+            wrapped_line = textwrap.wrap(line, 72)
+            wrapped_line = '\n'.join(wrapped_line)
+            errors.append(
                 f"Line '{line}' exceeds the recommended maximum length of 72 characters. To improve readability and maintainability, consider rewording the line to be more concise or breaking it into multiple shorter lines.")
+            suggestions.append(
+                f"Consider breaking up '{line}' into multiple lines like the following:\n{wrapped_line}")
 
     if not has_blank_line and len(stripped_lines) > 1:
         errors.append(
@@ -286,7 +303,8 @@ def main(repo_path=None, dry_run=False):
         verbose=True,
         memory=True,
         allow_delegation=False,
-        llm=openai_llm
+        llm=openai_llm,
+        max_iterations=1,
     )
 
     second_code_analyser = Agent(
@@ -314,7 +332,8 @@ def main(repo_path=None, dry_run=False):
         verbose=True,
         memory=True,
         allow_delegation=False,
-        llm=claude_llm_medium
+        llm=claude_llm_medium,
+        max_iterations=1,
     )
 
     commit_suggester = Agent(
@@ -328,7 +347,8 @@ def main(repo_path=None, dry_run=False):
         - Provide a concise yet informative summary in the subject line
         - Elaborate further in the body when needed, explaining the 'why' and 'how'
         - Maintain a line length of around 72 characters for readability
-        - Use UK English spelling and grammar
+        - If the commit message is found to be invalid by the validator, revise the message based on the feedback and try again
+        - Ensure conventions for UK English spelling, grammar, punctuation, and terminology are followed
 
         The commit message should accurately reflect the changes and enhance the project's commit history.
 
@@ -361,6 +381,8 @@ def main(repo_path=None, dry_run=False):
         - Verify alignment with external coding and documentation best practices
         - Suggest enhancements for clarity, impact, and alignment with project goals
         - Flag any issues or deviations from team-specific conventions
+        - Provide clear and actionable feedback for improving the commit message if it doesn't meet the standards
+        - If the message is invalid, suggest specific changes that can be made to make it valid
         - Ensure conventions for UK English spelling, grammar, punctuation, and terminology are followed
 
         This agent serves as a quality assurance step to validate the suggested commit message, ensuring it meets all necessary standards and conventions.
@@ -383,8 +405,8 @@ def main(repo_path=None, dry_run=False):
         llm=claude_llm_medium
     )
 
-    finalizer = Agent(
-        role='Commit Message Finalizer',
+    finaliser = Agent(
+        role='Commit Message Finaliser',
         goal="""
             Review the suggested commit message, incorporating feedback from code analysis, initial suggestion, and external validation tasks. 
 
@@ -393,11 +415,13 @@ def main(repo_path=None, dry_run=False):
             - Incorporate all necessary details and context from the code analysis
             - Address any issues or suggestions raised during the external validation step
             - Maintain clarity, conciseness, and compliance with all guidelines
-            - Use UK English spelling and grammar
+            - If the message is found to be invalid, work with the other agents to iteratively improve it until it meets all standards
+            - Maintain clarity, conciseness, and compliance with all guidelines
+            - Use UK English spelling, grammar, punctuation, and terminology
 
-            As the Commit Message Finalizer, your role is to review and incorporate feedback from previous steps to produce a polished, high-quality commit message that meets all project standards.
+            As the Commit Message Finaliser, your role is to review and incorporate feedback from previous steps to produce a polished, high-quality commit message that meets all project standards.
             """,
-        backstory='With an exceptional eye for detail and a comprehensive understanding of project standards, you ensure every commit message is clear, concise, and in full compliance with all guidelines.',
+        backstory='As the Commit Message Finaliser, you take pride in delivering commit messages that meet the highest standards. You work tirelessly with the other agents, iterating and refining the message until it is deemed valid and in full compliance with all guidelines. Your meticulous attention to detail ensures that every commit message adheres to UK English conventions and project-specific requirements.',
         verbose=True,
         memory=True,
         allow_delegation=True,
@@ -441,28 +465,17 @@ def main(repo_path=None, dry_run=False):
         expected_output="""
             The final, ready-to-use commit message that adheres to all project and conventional standards.
             """,
-        agent=finalizer,
+        agent=finaliser,
     )
 
     # Initialize the crew with agents, tasks, and process configuration
     crew = Crew(
-        agents=[first_code_analyser, second_code_analyser, commit_suggester, external_validator, finalizer],
         tasks=[first_analyse_task, second_analyse_task, suggest_task, external_validation_task, finalizing_task],
-        verbose=True,
-        llm=claude_llm_high,
-        process=Process.sequential,
+        agents=[first_code_analyser, second_code_analyser, commit_suggester, external_validator, finaliser],
         manager_llm=ChatOpenAI(model="gpt-4"),
-        description="""
-        This crew is responsible for analysing code changes, generating a conventional commit message, validating it against best practices, and finalising the message.
-
-        The workflow is as follows:
-        1. Two code analysers (using OpenAI GPT-4 and Claude models) provide complementary summaries of the code changes
-        2. A commit message suggester crafts a conventional commit message based on the code changes and current message
-        3. An external validator checks the suggested message against conventional commit standards and best practices
-        4. A finalizer incorporates feedback from all previous steps to produce a polished, high-quality commit message
-
-        The crew follows a sequential process, with a manager (using GPT-4) overseeing the workflow and ensuring smooth collaboration between agents.
-        """
+        process=Process.sequential,
+        verbose=True,
+        share_crew=False,
     )
 
     # Kick off the crew with the necessary inputs
