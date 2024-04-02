@@ -197,8 +197,8 @@ def pull_commit_messages_text_file(repo_path):
 def get_examples():
     """Return a string containing example commit messages"""
     example1 = """Commit: 7058c7a9cc55e2dd81ea53ac401c98d48b394418
-    ```md
-    feat(search): Add filtering options to search API
+```md
+feat(search): Add filtering options to search API
 
 - Introduce `filter` query parameter to search endpoint
 - Implement filtering functionality in `SearchService`
