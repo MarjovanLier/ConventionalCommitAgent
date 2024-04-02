@@ -39,8 +39,8 @@ def wrap_text(input_text, width=72):
     return '\n'.join(wrapped_lines)
 
 
-@tool("Conventional Commit Message Validator")
-def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] | bool]:
+@tool("First Conventional Commit Message Validator")
+def first_commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] | bool]:
     """
     Use this tool to validate that a suggested commit message follows the Conventional Commits 1.0.0 specification.
 
@@ -170,6 +170,31 @@ def commit_message_validator(suggested_commit_msg: str) -> dict[str, list[str] |
     }
 
 
+@tool("Second Conventional Commit Message Validator")
+def second_commit_message_validator(suggested_commit_msg: str) -> str:
+    """
+    Use this tool to validate that a suggested commit message follows the Conventional Commits 1.0.0 specification.
+    """
+    suggested_commit_msg = suggested_commit_msg.replace('`', '\`').strip()
+    suggested_commit_msg = suggested_commit_msg.replace('"', '\"').strip()
+
+    # Get the path of where main.py is located
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+
+    command = 'echo "' + suggested_commit_msg + '" | ' + root_dir + '/node_modules/@commitlint/cli/cli.js -V -g ' + root_dir + '/.commitlintrc.json'
+
+    print(f"Command: {command}")
+
+    # Run the command to validate the commit message
+    return_data = subprocess.getoutput(command)
+
+    return_data = return_data.strip()
+
+    print(f"Return data: {return_data}")
+
+    return return_data
+
+
 def is_git_repo(path):
     """Check if the given path is a git repository"""
     try:
@@ -293,7 +318,7 @@ def main(repo_path=None, dry_run=False):
             As the First Code Change Summariser, your role is to provide an initial summary of the code changes using the OpenAI GPT-4 model. This summary will be complemented by the Second Code Change Summariser, which uses the Claude model for a different perspective.
 
             -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-            Current Commit Message:
+            Current/Old Commit Message:
             {commit_msg}
             -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
             Commit Diff:
@@ -322,7 +347,7 @@ def main(repo_path=None, dry_run=False):
             As the Second Code Change Summariser, your role is to provide a complementary summary of the code changes using the Claude model. This summary will offer a different perspective to the First Code Change Summariser, which uses the OpenAI GPT-4 model.
 
             -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-            Current Commit Message:
+            Current/Old Commit Message:
             {commit_msg}
             -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
             Commit Diff:
@@ -353,7 +378,7 @@ def main(repo_path=None, dry_run=False):
         The commit message should accurately reflect the changes and enhance the project's commit history.
 
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
-        Current Commit Message:
+        Current/Old Commit Message:
         {commit_msg}
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
         Commit Diff:  
@@ -366,7 +391,7 @@ def main(repo_path=None, dry_run=False):
         verbose=True,
         memory=True,
         allow_delegation=True,
-        tools=[commit_message_validator],
+        tools=[first_commit_message_validator, second_commit_message_validator],
         llm=claude_llm_low
     )
 
@@ -377,7 +402,7 @@ def main(repo_path=None, dry_run=False):
 
         Responsibilities:
         - Review the suggested commit message to ensure compliance with conventional commit standards
-        - Use the commit_message_validator tool to validate the message structure and format
+        - Use the commit message validator tools to validate the message structure and format
         - Verify alignment with external coding and documentation best practices
         - Suggest enhancements for clarity, impact, and alignment with project goals
         - Flag any issues or deviations from team-specific conventions
@@ -388,7 +413,7 @@ def main(repo_path=None, dry_run=False):
         This agent serves as a quality assurance step to validate the suggested commit message, ensuring it meets all necessary standards and conventions.
 
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
-        Current Commit Message:
+        Current/Old Commit Message:
         {commit_msg}
         -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
         Commit Diff:  
@@ -401,7 +426,7 @@ def main(repo_path=None, dry_run=False):
         verbose=True,
         memory=True,
         allow_delegation=True,
-        tools=[commit_message_validator],
+        tools=[first_commit_message_validator, second_commit_message_validator],
         llm=claude_llm_medium
     )
 
